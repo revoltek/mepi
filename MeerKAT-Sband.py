@@ -1,4 +1,7 @@
 #!/usr/bin/python3
+"""
+best is to run this script by copypasting in ipython3
+"""
 
 import os, sys, logging
 import casatasks as casa
@@ -8,7 +11,8 @@ import numpy as np
 
 # external commands:
 # tricolour_command = f'singularity run --bind $PWD -B /local/work/fdg ~/storage/tricolour.simg tricolour'
-shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /local/work/fdg /iranet/groups/lofar/containers/flocs-latest.simg shadems --no-lim-save'
+#shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /local/work/fdg /iranet/groups/lofar/containers/flocs-latest.simg shadems --no-lim-save'
+shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /localwork/fdg /lofar/baq1889/flocs-latest.simg shadems --no-lim-save'
 aoflagger_command = f'aoflagger -v -j 64'
 wsclean_command = f'wsclean -j 64'
 
