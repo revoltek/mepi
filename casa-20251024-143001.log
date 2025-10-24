@@ -1,0 +1,27 @@
+2025-10-24 14:30:03	INFO	::casa	
+2025-10-24 14:30:03	INFO	::casa	
+2025-10-24 14:30:03	INFO	::casa	
+2025-10-24 14:30:03	INFO	::casa	
+2025-10-24 14:30:03	INFO	::casa	Python version 3.8.10
+2025-10-24 14:30:03	INFO	::casa	CASA Version PIPELINE 6.5.4.9
+2025-10-24 14:30:03	INFO	::casa	
+2025-10-24 14:30:03	INFO	::casa	Found an existing telemetry logfile: /home/baq1889/.casa/casastats-6.5.4.9-f81d81e0e826c221-20251024-142636.log
+2025-10-24 14:30:03	INFO	::casa	Telemetry log file: /home/baq1889/.casa/casastats-6.5.4.9-f81d81e0e826c221-20251024-142636.log
+2025-10-24 14:30:03	INFO	::casa	Checking telemetry submission interval
+2025-10-24 14:30:03	INFO	::casa	Telemetry submit interval not reached. Not submitting data.
+2025-10-24 14:30:03	INFO	::casa	Next telemetry data submission in: 6 days, 23:56:33.863737
+2025-10-24 14:30:03	INFO	::casa	
+2025-10-24 14:30:03	INFO	::casa	optional configuration file config.py not found, continuing CASA startup without it
+2025-10-24 14:30:03	INFO	::casa	
+2025-10-24 14:30:03	INFO	::casa	Checking Measures tables in data repository sub-directory /home/baq1889/.casa/data/geodetic
+2025-10-24 14:30:03	INFO	::casa	  IERSeop2000 (version date, last date in table (UTC)): 2025/10/06/15:15, 2025/09/06/00:00:00
+2025-10-24 14:30:03	INFO	::casa	  IERSeop97 (version date, last date in table (UTC)): 2025/10/06/15:15, 2025/09/06/00:00:00
+2025-10-24 14:30:03	INFO	::casa	  IERSpredict (version date, last date in table (UTC)): 2025/10/23/15:15, 2026/01/21/00:00:00
+2025-10-24 14:30:03	INFO	::casa	  TAI_UTC (version date, last date in table (UTC)): 2025/10/18/15:15, 2017/01/01/00:00:00
+2025-10-24 14:30:14	SEVERE	plotms::::casa	Exception Reported: Error in plotms: ERROR: DISPLAY environment variable is not set! Cannot run plotms.
+2025-10-24 14:30:14	INFO	plotms::::casa	Traceback (most recent call last):
+2025-10-24 14:30:14	INFO	plotms::::casa+	  File "/opt/casa/lib/py/lib/python3.8/site-packages/casaplotms/gotasks/plotms.py", line 3061, in __call__
+2025-10-24 14:30:14	INFO	plotms::::casa+	    _return_result_ = _plotms_t( _pc.document['vis'],_pc.document['gridrows'],_pc.document['gridcols'],_pc.document['rowindex'],_pc.document['colindex'],_pc.document['plotindex'],_pc.document['xaxis'],_pc.document['xdatacolumn'],_pc.document['xframe'],_pc.document['xinterp'],_pc.document['yaxis'],_pc.document['ydatacolumn'],_pc.document['yframe'],_pc.document['yinterp'],_pc.document['yaxislocation'],_pc.document['selectdata'],_pc.document['field'],_pc.document['spw'],_pc.document['timerange'],_pc.document['uvrange'],_pc.document['antenna'],_pc.document['scan'],_pc.document['correlation'],_pc.document['array'],_pc.document['observation'],_pc.document['intent'],_pc.document['feed'],_pc.document['msselect'],_pc.document['averagedata'],_pc.document['avgchannel'],_pc.document['avgtime'],_pc.document['avgscan'],_pc.document['avgfield'],_pc.document['avgbaseline'],_pc.document['avgantenna'],_pc.document['avgspw'],_pc.document['scalar'],_pc.document['transform'],_pc.document['freqframe'],_pc.document['restfreq'],_pc.document['veldef'],_pc.document['phasecenter'],_pc.document['extendflag'],_pc.document['extcorr'],_pc.document['extchannel'],_pc.document['iteraxis'],_pc.document['xselfscale'],_pc.document['yselfscale'],_pc.document['xsharedaxis'],_pc.document['ysharedaxis'],_pc.document['customsymbol'],_pc.document['symbolshape'],_pc.document['symbolsize'],_pc.document['symbolcolor'],_pc.document['symbolfill'],_pc.document['symboloutline'],_pc.document['coloraxis'],_pc.document['customflaggedsymbol'],_pc.document['flaggedsymbolshape'],_pc.document['flaggedsymbolsize'],_pc.document['flaggedsymbolcolor'],_pc.document['flaggedsymbolfill'],_pc.document['flaggedsymboloutline'],_pc.document['xconnector'],_pc.document['timeconnector'],_pc.document['plotrange'],_pc.document['title'],_pc.document['titlefont'],_pc.document['xlabel'],_pc.document['xaxisfont'],_pc.document['ylabel'],_pc.document['yaxisfont'],_pc.document['showmajorgrid'],_pc.document['majorwidth'],_pc.document['majorstyle'],_pc.document['majorcolor'],_pc.document['showminorgrid'],_pc.document['minorwidth'],_pc.document['minorstyle'],_pc.document['minorcolor'],_pc.document['showlegend'],_pc.document['legendposition'],_pc.document['plotfile'],_pc.document['expformat'],_pc.document['verbose'],_pc.document['exprange'],_pc.document['highres'],_pc.document['dpi'],_pc.document['width'],_pc.document['height'],_pc.document['overwrite'],_pc.document['showgui'],_pc.document['clearplots'],_pc.document['callib'],_pc.document['headeritems'],_pc.document['showatm'],_pc.document['showtsky'],_pc.document['showimage'] )
+2025-10-24 14:30:14	INFO	plotms::::casa+	  File "/opt/casa/lib/py/lib/python3.8/site-packages/casaplotms/private/task_plotms.py", line 234, in plotms
+2025-10-24 14:30:14	INFO	plotms::::casa+	    raise RuntimeError('ERROR: DISPLAY environment variable is not set! Cannot run plotms.')
+2025-10-24 14:30:14	INFO	plotms::::casa+	RuntimeError: ERROR: DISPLAY environment variable is not set! Cannot run plotms.

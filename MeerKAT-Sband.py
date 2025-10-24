@@ -160,8 +160,6 @@ def convert_flux_model(nu=None, a=1, b=0, c=0, d=0, Reffreq=1.0e9):
     MHz = 1e6
     S = 10**(a + b*np.log10(nu/MHz) + c*np.log10(nu/MHz)**2 + d*np.log10(nu/MHz)**3)
     return fit_flux_model(nu, S, Reffreq, np.ones_like(nu), sref=1, order=3)
-    S = 10**(a + b*np.log10(nu/MHz) +c*np.log10(nu/MHz)**2 + d*np.log10(nu/MHz)**3)
-    return fit_flux_model(nu, S , Reffreq,np.ones_like(nu),sref=1 ,order=order)
 
 ##############################
 # Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap
@@ -233,13 +231,14 @@ for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
     # Delay calibration (fast to track the ionosphere)
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['K_tab'], gaintype='K', refant=ref_ant, solint='8s')
-    # plotms(vis=tab['K_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
-    # Gani calibration (fast to track the ionosphere)
+    # plotms(vis=tab['K_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay') # all plotms should be run separately in a casa session
+    # Gain calibration (fast to track the ionosphere)
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Gp_tab'], gaintype='G', calmode='p', 
                  gaintable=[tab['K_tab']], refant=ref_ant, solint='8s')
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Ga_tab'], gaintype='G', calmode='a', 
                  gaintable=[tab['K_tab'],tab['Gp_tab']], refant=ref_ant)
     # plotms(vis=tab['Gp_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase')
+    # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
     # one can now combine the scans and use different B as diagnostics
     casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', 
                   gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']], combine='scan', solint='inf', refant=ref_ant)
