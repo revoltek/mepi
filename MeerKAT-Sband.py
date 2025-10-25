@@ -287,20 +287,21 @@ os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {B
 logger.info('Bootstrapping secondary calibrator...')
 casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, \
              gaintable=[tab['Ga_tab'], tab['Gp_tab'], tab['B_tab'], tab['Df_tab']])
-# plotms(vis=tab['Ksec_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
+# plotms(vis=tab['Ksec_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay', xconnector='line')
 casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, \
              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab']])
-# plotms(vis=tab['Gpsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase')
+# plotms(vis=tab['Gpsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, \
              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab'],tab['Gpsec_tab']])
-# plotms(vis=tab['Tsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp')
+# plotms(vis=tab['Tsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
-#image the secondary and selfcal
+# image the secondary and selfcal to improve the local model
 casa.applycal(vis=calms,field=PhaseCal, parang=True, flagbackup=False, \
               gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
-os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -update-model-required -weight briggs -0.2 -size 8000 8000 \
-        -scale 0.5arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
-        -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {calms} > wsclean_{PhaseCal}-selfcal.log')
+os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
+          -update-model-required -weight briggs -0.2 -size 8000 8000 \
+          -scale 0.5arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {calms} > wsclean_{PhaseCal}-selfcal.log')
 
 casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, \
              gaintable=[tab['Ga_tab'], tab['Gp_tab'], tab['B_tab'], tab['Df_tab']])
@@ -320,6 +321,7 @@ casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', \
 # here we can use also secT to trace slow variations in the amp
 casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', 
              gaintable=[tab['Kpol_tab'], tab['Ga_tab'], tab['B_tab'], tab['Df_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
+# plotms(vis=tab['Gppol_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 
 # Xf that is constant within a scan, but it drift slowly with time, try not combining scans
 casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant,
@@ -329,48 +331,41 @@ casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solin
 logger.info('Applying calibration to PolCal and test imaging...')
 # Final applycal to PolCal to check pol quality
 casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, \
-              gaintable=[tab['Kpol_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gppol_tab'], tab['Tsec_tab'], tab['Df_tab'],tab['Xf_tab']])
+              gaintable=[tab['Kpol_tab'],tab['Ga_tab'],tab['B_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab']])
 
-# test image of the polcal
-os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -update-model-required -weight briggs -0.2 -size 8000 8000 \
-        -scale 0.5arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
-        -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {calms} > wsclean_{PolCal}-selfcal.log')
+# test image of the polcal - no update model!
+os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 1024  -parallel-gridding 64 \
+          -no-update-model-required -weight briggs -0.2 -size 1000 1000 \
+          -scale 0.5arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {calms} > wsclean_{PolCal}-selfcal.log')
 
 ###############################################################################
 # Target
 
-# selfcal only on scalar amp and possibly diag phase. If dig phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
+# Split the target
+logger.info('Splitting target...')
+if not os.path.exists(tgtms):
+       casa.split(vis = invis, outputvis = tgtms, field = f"{Targets}", datacolumn = 'data', spw = spw_selection)
+       logger.info(f'Target split and saved in {tgtms}')
+else:
+       logger.info('Target has already been split previously')
 
-# applycal(vis  = calms, parang = True, calwt = False, field = '',\
-#     gaintable = [ktab, btab, kxtab, ptab_xyf, dgen, ftab],\
-#     gainfield = ['', '', '', '', '', ''],\
-#     interp    = ['nearest,linear','nearest,linearflag','nearest,linear','nearest,linearflag','linear,linearflag','linear,linear'])
+# Standard flagging for shadowing, zero-clip, and auto-correlation
+casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
+casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
+casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 100.0])
+casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 
+# selfcal only on scalar amp and possibly diag phase.
+# If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
 
-# wsclean -verbose -log-time -no-update-model-required -j 64 \
-#     -field 2 -weight briggs -0.5 -size 2048 2048 -scale 1.0asec -channels-out 48 \
-#     -no-mf-weighting -weighting-rank-filter 3 -auto-mask 5 -auto-threshold 1.0 \
-#     -taper-gaussian 6 -pol IQUV -data-column CORRECTED_DATA -niter 10000 -gain 0.05 \
-#     -mgain 0.9 -join-polarizations -join-channels -squared-channel-joining -gridder wgridder \
-#     -padding 1.3 -local-rms -name img/3c286_wsclean_FullStokes MS_Files/m87sband-cal.MS
+casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
+              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
 
-# # IMAGE 3C138... OTHER PYTHON FILE
-
-# ### WORK ON TARGET ...
-# # Split target ...
-# split(vis = invis, outputvis = tgtms, field = "M87", datacolumn = 'data', spw = '0:210~3841')
-
-# # Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap
-# casa.tb.open(calms+'/FEED', nomodify=False)
-# feed_angle = casa.tb.getcol('RECEPTOR_ANGLE')
-# new_feed_angle = np.zeros(feed_angle.shape)
-# casa.tb.putcol('RECEPTOR_ANGLE', new_feed_angle)
-# casa.tb.close()
-
-# applycal(vis  = tgtms, parang = True, calwt = False, field = '',\
-#     gaintable = [ktab, btab, kxtab, ptab_xyf, dgen, ftab],\
-#     gainfield = ['', '', '', '', '', gcal],\
-#     interp    = ['nearest,linear','nearest,linearflag','nearest,linear','nearest,linearflag','linear,linearflag','linear,linear'])
+os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
+          -update-model-required -weight briggs -0.2 -size 8000 8000 \
+          -scale 0.5arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 {tgtms} > wsclean_{Targets}-selfcal.log')
 
 # flagmanager(vis = tgtms, mode = 'save', versionname = 'ApplyCal')
 
