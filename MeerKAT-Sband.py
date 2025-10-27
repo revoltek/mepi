@@ -60,11 +60,6 @@ CalibFields = ','.join([BandPassCal, PolCal, PhaseCal])
 # create dirs if missing
 for d in ['IMG', 'PLOTS', 'MS_Files', inpath]:
     os.makedirs(d, exist_ok=True)
-# field ids
-msmd = msmetadata()
-msmd.open(invis)
-PhaseCal_id = msmd.fieldsforname(PhaseCal)[0]
-PolCal_id = msmd.fieldsforname(PolCal)[0]
 
 #############################
 ### Logs Setting up and functions
@@ -178,6 +173,12 @@ if not os.path.exists(calms):
 else:
        logger.info('Calibrators have already been split previously')
 
+# field ids for imaging
+msmd = msmetadata()
+msmd.open(calms)
+PhaseCal_id = msmd.fieldsforname(PhaseCal)[0]
+PolCal_id = msmd.fieldsforname(PolCal)[0]
+
 # Standard flagging for shadowing, zero-clip, and auto-correlation
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
@@ -186,9 +187,7 @@ casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~
 
 # Set flux density scale
 for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
-
     logger.info('Setting model for calibrator %s' % cal)
-
     if cal == 'J1939-6342':
         casa.setjy(vis = calms, field = cal, standard = 'Stevens-Reynolds 2016', usescratch = True)
     elif cal == 'J0408-6545':
@@ -334,10 +333,10 @@ casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, \
               gaintable=[tab['Kpol_tab'],tab['Ga_tab'],tab['B_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab']])
 
 # test image of the polcal - no update model!
-os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 1024  -parallel-gridding 64 \
+os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
           -no-update-model-required -weight briggs -0.2 -size 1000 1000 \
           -scale 0.5arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
-          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {calms} > wsclean_{PolCal}-selfcal.log')
+          -multiscale -fit-spectral-pol 3 -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {calms} > wsclean_{PolCal}-selfcal.log')
 
 ###############################################################################
 # Target
