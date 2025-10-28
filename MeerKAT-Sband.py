@@ -9,13 +9,7 @@ from casatools import msmetadata
 from casatools import table
 import numpy as np
 
-# external commands:
-# tricolour_command = f'singularity run --bind $PWD -B /local/work/fdg ~/storage/tricolour.simg tricolour'
-#shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /local/work/fdg /iranet/groups/lofar/containers/flocs-latest.simg shadems --no-lim-save'
-shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /localwork/fdg /lofar/baq1889/flocs-latest.simg shadems --no-lim-save'
-aoflagger_command = f'aoflagger -v -j 64'
-wsclean_command = f'wsclean -j 64'
-
+############################################
 # input variables:
 invis   = 'RawData/m87sband-flipped.MS'
 calms   = 'MS_Files/m87sband-cal.MS'
@@ -34,6 +28,14 @@ BandPassCal = 'J1939-6342,J0408-6545'
 PolCal = 'J1331+3030'
 PhaseTargetDic = {'J1150-0023':'M87'} # PhaseCal <--> Target pairs
 ############################################
+
+############################################################
+# external commands:
+# tricolour_command = f'singularity run --bind $PWD -B /local/work/fdg ~/storage/tricolour.simg tricolour'
+#shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /local/work/fdg /iranet/groups/lofar/containers/flocs-latest.simg shadems --no-lim-save'
+shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /localwork/fdg /lofar/baq1889/flocs-latest.simg shadems --no-lim-save'
+aoflagger_command = f'aoflagger -v -j 64'
+wsclean_command = f'wsclean -j 64'
 
 # Name your gain tables
 tab = {'K_tab' : 'delay_bp.cal',
@@ -352,27 +354,24 @@ else:
 # Standard flagging for shadowing, zero-clip, and auto-correlation
 casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
-casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 100.0])
+casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
 
+
 casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
               gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
+casa.flagmanager(vis = tgtms, mode = 'save', versionname = 'AfterApplyCal')
 
-os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
-          -update-model-required -weight briggs -0.2 -size 8000 8000 \
-          -scale 0.5arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal -reorder -parallel-deconvolution 1024 -parallel-reordering 5 -parallel-gridding 64 \
+          -update-model-required -weight briggs -0.2 -size 2500 2500 \
+          -scale 0.7arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels \
           -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 {tgtms} > wsclean_{Targets}-selfcal.log')
 
-# flagmanager(vis = tgtms, mode = 'save', versionname = 'ApplyCal')
-
 # aoflagger-setup
-# aoflagger -v -j 32 -strategy meerkat_custom20230417.lua -column CORRECTED_DATA MS_Files/xxx.MS
-
-# split(vis = tgtms, outputvis = tgtavgms, datacolumn = 'corrected', width = 8)
-# flagdata(vis=tgtavgms, mode='manual', spw = '0:66~72,0:106~114,0:202~210,0:278~285')
+# aoflagger -v -j 32 -strategy meerkat_custom20230417.lua -column CORRECTED_DATA {tgtms}
 
 # # Casa
 # for i in range(30):
