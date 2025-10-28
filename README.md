@@ -11,7 +11,7 @@ To run the singularity one can use (for instance):
 For L and S band the data must have X and Y flipped using the script "correct_parang.py" by Ben Hugo
 https://github.com/bennahugo/LunaticPolarimetry/blob/master/correct_parang.py
 
-`python correct_parang.py -f xxx --noparang  --applyantidiag`
+`python correct_parang.py --noparang  --applyantidiag MSFILE`
 
 the script writes the output in the CORRECTED_DATA column, so the corrected data needs to be split after the correction
 
