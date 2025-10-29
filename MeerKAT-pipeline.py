@@ -22,6 +22,8 @@ ref_ant = 'm003'
 script_dir = '.'
 aoflagger_strategy = os.path.join(script_dir, 'aoflagger_StokesQUV.lua')
 spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command
+freqbin = 1 # number of channel to average for the target split
+timebin = '0s' # time binning for the target split
 
 FluxCal = 'J1939-6342' # one of the BandPassCals
 BandPassCal = 'J1939-6342,J0408-6545'
@@ -65,8 +67,8 @@ for d in ['IMG', 'PLOTS', 'MS_Files', inpath]:
 
 #############################
 ### Logs Setting up and functions
-log_file = os.path.join(invis + '.log')
-casa_log = os.path.join(invis + '_casa.log')
+log_file = os.path.join('mepi.log')
+casa_log = os.path.join('mepi_casa.log')
 
 log_level = logging.DEBUG
 logging.basicConfig(filename=log_file,
@@ -351,36 +353,49 @@ if not os.path.exists(tgtms):
 else:
        logger.info('Target has already been split previously')
 
+casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
+              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
+
+# Split the target
+logger.info('Splitting target avg...')
+if not os.path.exists(tgtavgms):
+       casa.split(vis = tgtms, outputvis = tgtavgms, field = f"{Targets}", datacolumn = 'corrected', spw = spw_selection,
+                  width=freqbin, timebin=timebin)
+       logger.info(f'Target split and saved in {tgtavgms}')
+else:
+       logger.info('Target has already been split previously')
+
 # Standard flagging for shadowing, zero-clip, and auto-correlation
-casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
-casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
-casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
-casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
+casa.flagdata(vis=tgtavgms, flagbackup=False, mode='shadow')
+casa.flagdata(vis=tgtavgms, flagbackup=False, mode='manual', autocorr=True)
+casa.flagdata(vis=tgtavgms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
+casa.flagdata(vis=tgtavgms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
 
-
-casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
-              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
-casa.flagmanager(vis = tgtms, mode = 'save', versionname = 'AfterApplyCal')
-
 os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal -reorder -parallel-deconvolution 1024 -parallel-reordering 5 -parallel-gridding 64 \
           -update-model-required -weight briggs -0.2 -size 2500 2500 \
           -scale 0.7arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels \
-          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 {tgtms} > wsclean_{Targets}-selfcal.log')
+          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
 
 # aoflagger-setup
 # aoflagger -v -j 32 -strategy meerkat_custom20230417.lua -column CORRECTED_DATA {tgtms}
 
-# # Casa
-# for i in range(30):
-#     tgtavgms   = 'MS_Files/m87sband-tgt-avg.MS'
-#     gaincal(vis=tgtavgms, caltable='selfcal%02i.G' %i, solint='8s', refant='m002', parang=False)
-#     gaincal(vis=tgtavgms, caltable='selfcal%02i.K' %i, solint='8s', refant='m002', gaintype='K', gaintable='selfcal%02i.G' %i, parang=False)
-#     bandpass(vis=tgtavgms, caltable='selfcal%02i.B' %i, combine='', solint='300s', gaintable=['selfcal%02i.G' %i, 'selfcal%02i.K' %i], refant='m002', parang=False)
-#     applycal(vis=tgtavgms, gaintable=['selfcal%02i.B' %i, 'selfcal%02i.G' %i, 'selfcal%02i.K' %i], interp=['linear,linearflag','linear', 'linear,linearflag'], parang=False)
-#     os.system('singularity exec ~/storage/pill.simg wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 -j 64 -mem 100 -update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 -deconvolution-channels 8 -pol XX,YY -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 -join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -fits-mask m87-07asec-2500.fits MS_Files/m87sband-tgt-avg.MS/' % i)
+# Casa
+for i in range(30):
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %i, solint='32s', refant=ref_ant, gaintype='K', parang=False)
+    # plotms(vis='CASA_Tables/selfcal%02i.K' %i, coloraxis='antenna1', xaxis='time', yaxis='delay')
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %i, calmode='p', solint='8s', refant=ref_ant, parang=False,
+                 gaintable=['CASA_Tables/selfcal%02i.K' %i])
+    # plotms(vis='CASA_Tables/selfcal%02i.Gp' %i, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %i, gaintype='T', calmode='a', solint='80s', refant=ref_ant, solnorm=True, parang=False,
+                 gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i])
+    # plotms(vis='CASA_Tables/selfcal%02i.Ga' %i, coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
+    #casa.bandpass(vis=tgtavgms, caltable='selfcal%02i.B' %i, combine='', solint='300s', gaintable=['selfcal%02i.G' %i, 'selfcal%02i.K' %i], refant='m002', parang=False)
+    casa.applycal(vis=tgtavgms, flagbackup=False, parang=True,
+                  gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i, 'CASA_Tables/selfcal%02i.Ga' %i])
+    os.system('singularity exec ~/storage/pill.simg wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 -j 64 -mem 100 -update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 -deconvolution-channels 8 -pol XX,YY -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 -join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -fits-mask m87-07asec-2500.fits MS_Files/m87sband-tgt-avg.MS/' % i)
 
 
 # # DP3
@@ -392,7 +407,7 @@ os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal -reorder -parallel-dec
 #         print(f'Working on {ms}...')
 #         # solve
 #         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
-#         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=diagonalamplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
+#         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
 #         # correct
 #         os.system(f'DP3 DP3-cor.parset msin={ms} msout=. cor1.parmdb={ms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
 #     # clean
