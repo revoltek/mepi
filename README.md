@@ -11,8 +11,8 @@ To run the singularity one can use (for instance):
 For L and S band the data must have X and Y flipped using the script "correct_parang.py" by Ben Hugo
 https://github.com/bennahugo/LunaticPolarimetry/blob/master/correct_parang.py
 
-`python correct_parang.py --noparang  --applyantidiag MSFILE`
+`python correct_parang.py -f {field_id} --noparang  --applyantidiag MSFILE`
 
-the script writes the output in the CORRECTED_DATA column, so the corrected data needs to be split after the correction
+the script writes the output in the CORRECTED_DATA column and needs to be run for each field, so the corrected data needs to be split after the correction.
 
 plots are done with shadems https://github.com/ratt-ru/shadeMS
