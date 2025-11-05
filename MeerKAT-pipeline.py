@@ -21,7 +21,7 @@ ref_ant = 'm003'
 #script_dir = os.path.dirname(os.path.abspath(__file__))
 script_dir = '.'
 aoflagger_strategy = os.path.join(script_dir, 'aoflagger_StokesQUV.lua')
-spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command
+spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command - this range is for band=S1
 freqbin = 1 # number of channel to average for the target split
 timebin = '0s' # time binning for the target split
 
@@ -85,7 +85,8 @@ os.remove(old_log_filename)
 # remove annoying warnings
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
-#### NEEDED FOR J0408-6545 from https://skaafrica.atlassian.net/wiki/spaces/ESDKB/pages/1481408634/Flux+and+bandpass+calibration
+###########################################
+#### Functions needed for J0408-6545 from https://skaafrica.atlassian.net/wiki/spaces/ESDKB/pages/1481408634/Flux+and+bandpass+calibration
 def casa_flux_model(lnunu0, iref, *args):
     """
     Compute model:
@@ -182,11 +183,13 @@ msmd = msmetadata()
 msmd.open(calms)
 PhaseCal_id = msmd.fieldsforname(PhaseCal)[0]
 PolCal_id = msmd.fieldsforname(PolCal)[0]
+central_freq = msmd.chanfreqs(0).mean()/1e9 # central freq in GHz
+msmd.close()
 
 # Standard flagging for shadowing, zero-clip, and auto-correlation
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
-casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 100.0])
+casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 
 # Set flux density scale
@@ -200,12 +203,20 @@ for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
         casa.setjy(vis = calms, field = cal, usescratch = True, standard = 'manual', \
             spix = [spix0, spix1, spix2, 0], fluxdensity = fluxdensity, reffreq = '%f Hz'%(reffreq))
     elif cal == 'J1331+3030':
-        I= 14.7172
-        alpha= [-0.4507, -0.1798, 0.0357]
-        reffreq= '1.47GHz'
-        polfrac= 0.098
-        polangle = 0.575959
-        rm=0.
+        if central_freq > 1.:
+            I= 14.7172
+            alpha= [-0.4507, -0.1798, 0.0357]
+            reffreq= '1.47GHz'
+            polfrac= 0.098
+            polangle = 0.575959
+            rm=0.
+        else:
+            I = 19.27475
+            alpha = [-0.42727, -0.14583]
+            reffreq = '0.816GHz'
+            polfrac = 0.06398396324
+            polangle = 0.41598756411
+            rm = 0.12
         casa.setjy(vis=calms, field=cal, usescratch = True, standard = 'manual', \
                    fluxdensity=[I,0,0,0], spix=alpha, reffreq=reffreq, polindex=polfrac, polangle=polangle, rotmeas=rm)
     else:
@@ -295,7 +306,7 @@ casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G',
              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab']])
 # plotms(vis=tab['Gpsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, \
-             gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab'],tab['Gpsec_tab']])
+             gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab'],tab['Gpsec_tab']]) # scalar as it can be polarised
 # plotms(vis=tab['Tsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
 # image the secondary and selfcal to improve the local model
@@ -356,7 +367,7 @@ else:
 casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
               gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
 
-# Split the target
+# Split the target averaged in freq and time
 logger.info('Splitting target avg...')
 if not os.path.exists(tgtavgms):
        casa.split(vis = tgtms, outputvis = tgtavgms, field = f"{Targets}", datacolumn = 'corrected', spw = spw_selection,
@@ -373,17 +384,14 @@ casa.flagdata(vis=tgtavgms, flagbackup=False, mode='manual', spw='0:850~900,0:16
 
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
-
-os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal -reorder -parallel-deconvolution 1024 -parallel-reordering 5 -parallel-gridding 64 \
-          -update-model-required -weight briggs -0.2 -size 2500 2500 \
-          -scale 0.7arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels \
-          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
-
-# aoflagger-setup
-# aoflagger -v -j 32 -strategy meerkat_custom20230417.lua -column CORRECTED_DATA {tgtms}
-
-# Casa
+casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
 for i in range(30):
+    # ok for m87 sband
+    os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{i} -reorder -parallel-deconvolution 1024 -parallel-reordering 5 \
+          -parallel-gridding 64 -update-model-required -weight briggs -0.2 -size 2500 2500 \
+          -scale 0.7arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels \
+          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 -fit-spectral-pol 3 -fits-mask m87-07asec-2500.fits -auto-mask 5 \
+          -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %i, solint='32s', refant=ref_ant, gaintype='K', parang=False)
     # plotms(vis='CASA_Tables/selfcal%02i.K' %i, coloraxis='antenna1', xaxis='time', yaxis='delay')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %i, calmode='p', solint='8s', refant=ref_ant, parang=False,
@@ -395,7 +403,16 @@ for i in range(30):
     #casa.bandpass(vis=tgtavgms, caltable='selfcal%02i.B' %i, combine='', solint='300s', gaintable=['selfcal%02i.G' %i, 'selfcal%02i.K' %i], refant='m002', parang=False)
     casa.applycal(vis=tgtavgms, flagbackup=False, parang=True,
                   gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i, 'CASA_Tables/selfcal%02i.Ga' %i])
-    os.system('singularity exec ~/storage/pill.simg wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 -j 64 -mem 100 -update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 -deconvolution-channels 8 -pol XX,YY -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 -join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -fits-mask m87-07asec-2500.fits MS_Files/m87sband-tgt-avg.MS/' % i)
+
+
+os.system('singularity exec ~/storage/pill.simg wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 '
+    '-j 64 -mem 100 -update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 '
+    '-deconvolution-channels 8 -pol XX,YY -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 '
+    '-join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -fits-mask m87-07asec-2500.fits ' \
+    'MS_Files/m87sband-tgt-avg.MS/' % i)
+
+# aoflagger-setup
+# aoflagger -v -j 32 -strategy meerkat_custom20230417.lua -column CORRECTED_DATA {tgtms}
 
 
 # # DP3
