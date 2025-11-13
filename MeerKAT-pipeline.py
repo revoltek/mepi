@@ -186,6 +186,9 @@ PolCal_id = msmd.fieldsforname(PolCal)[0]
 central_freq = msmd.chanfreqs(0).mean()/1e9 # central freq in GHz
 msmd.close()
 
+# imaging parameters scaled from S1 band
+pexelscale = 0.7 * (2.4/central_freq) # arcsec
+
 # Standard flagging for shadowing, zero-clip, and auto-correlation
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
@@ -314,14 +317,15 @@ casa.applycal(vis=calms,field=PhaseCal, parang=True, flagbackup=False, \
               gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
 os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
           -update-model-required -weight briggs -0.2 -size 8000 8000 \
-          -scale 0.5arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+          -scale {pexelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
           -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {calms} > wsclean_{PhaseCal}-selfcal.log')
 
 casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, \
              gaintable=[tab['Ga_tab'], tab['Gp_tab'], tab['B_tab'], tab['Df_tab']])
 casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, \
              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab']])
-casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, \
+# parang=True for polarised sources, otherwise it absorbs part of the effect
+casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, \
              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab'],tab['Gpsec_tab']])
 
 ##############################################################################
@@ -350,8 +354,10 @@ casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, \
 # test image of the polcal - no update model!
 os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
           -no-update-model-required -weight briggs -0.2 -size 1000 1000 \
-          -scale 0.5arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+          -scale {pexelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels -squared-channel-joining \
           -multiscale -fit-spectral-pol 3 -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {calms} > wsclean_{PolCal}-selfcal.log')
+
+# TODO: if the secondary is polarised we should re-do its calibration including Xf
 
 ###############################################################################
 # Target
@@ -389,8 +395,8 @@ for i in range(30):
     # ok for m87 sband
     os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{i} -reorder -parallel-deconvolution 1024 -parallel-reordering 5 \
           -parallel-gridding 64 -update-model-required -weight briggs -0.2 -size 2500 2500 \
-          -scale 0.7arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels \
-          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 -fit-spectral-pol 3 -fits-mask m87-07asec-2500.fits -auto-mask 5 \
+          -scale {pexelscale}arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels \
+          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 -fit-spectral-pol 3 -fits-mask m87-07asec-2500.fits \
           -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %i, solint='32s', refant=ref_ant, gaintype='K', parang=False)
     # plotms(vis='CASA_Tables/selfcal%02i.K' %i, coloraxis='antenna1', xaxis='time', yaxis='delay')
@@ -404,6 +410,12 @@ for i in range(30):
     casa.applycal(vis=tgtavgms, flagbackup=False, parang=True,
                   gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i, 'CASA_Tables/selfcal%02i.Ga' %i])
 
+# pol cleaning
+os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -reorder -parallel-deconvolution 1024 -parallel-reordering 5 \
+          -parallel-gridding 64 -update-model-required -weight briggs -0.2 -size 2500 2500 \
+          -scale {pexelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels -squared-channel-joining \
+          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 -fit-spectral-pol 3 -fits-mask m87-07asec-2500.fits \
+          -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
 
 os.system('singularity exec ~/storage/pill.simg wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 '
     '-j 64 -mem 100 -update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 '
