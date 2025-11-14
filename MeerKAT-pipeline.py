@@ -332,7 +332,6 @@ casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', 
 # Solve for polarization alignment
 logger.info('Solving for polarization alignment...')
 os.system(f"{shadems_command} --xaxis FREQ  --yaxis CORRECTED_DATA --field {PolCal} --corr XY,YX {calms}")
-# plotms(vis=tab['Gppol_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase')
 casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', \
              gaintable=[tab['Ga_tab'],tab['B_tab'], tab['Df_tab'], tab['Gpsec_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
 # plotms(vis=tab['Kpol_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
@@ -354,7 +353,7 @@ casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, \
 # test image of the polcal - no update model!
 os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
           -no-update-model-required -weight briggs -0.2 -size 1000 1000 \
-          -scale {pexelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels -squared-channel-joining \
+          -scale {pexelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
           -multiscale -fit-spectral-pol 3 -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {calms} > wsclean_{PolCal}-selfcal.log')
 
 # TODO: if the secondary is polarised we should re-do its calibration including Xf
@@ -376,7 +375,7 @@ casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
 # Split the target averaged in freq and time
 logger.info('Splitting target avg...')
 if not os.path.exists(tgtavgms):
-       casa.split(vis = tgtms, outputvis = tgtavgms, field = f"{Targets}", datacolumn = 'corrected', spw = spw_selection,
+       casa.split(vis = tgtms, outputvis = tgtavgms, field = f"{Targets}", datacolumn = 'corrected',
                   width=freqbin, timebin=timebin)
        logger.info(f'Target split and saved in {tgtavgms}')
 else:
@@ -403,21 +402,22 @@ for i in range(30):
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %i, calmode='p', solint='8s', refant=ref_ant, parang=False,
                  gaintable=['CASA_Tables/selfcal%02i.K' %i])
     # plotms(vis='CASA_Tables/selfcal%02i.Gp' %i, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
-    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %i, gaintype='T', calmode='a', solint='80s', refant=ref_ant, solnorm=True, parang=False,
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %i, gaintype='T', calmode='a', solint='80s', refant=ref_ant, solnorm=True, parang=True,
                  gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i])
     # plotms(vis='CASA_Tables/selfcal%02i.Ga' %i, coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
     #casa.bandpass(vis=tgtavgms, caltable='selfcal%02i.B' %i, combine='', solint='300s', gaintable=['selfcal%02i.G' %i, 'selfcal%02i.K' %i], refant='m002', parang=False)
     casa.applycal(vis=tgtavgms, flagbackup=False, parang=True,
                   gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i, 'CASA_Tables/selfcal%02i.Ga' %i])
 
-# pol cleaning
+# pol cleaning - possible problem with -squared-channel-joining when using -multiscale
 os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -reorder -parallel-deconvolution 1024 -parallel-reordering 5 \
           -parallel-gridding 64 -update-model-required -weight briggs -0.2 -size 2500 2500 \
           -scale {pexelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels -squared-channel-joining \
           -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 -fit-spectral-pol 3 -fits-mask m87-07asec-2500.fits \
           -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
 
-os.system('singularity exec ~/storage/pill.simg wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 '
+
+os.system('wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 '
     '-j 64 -mem 100 -update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 '
     '-deconvolution-channels 8 -pol XX,YY -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 '
     '-join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -fits-mask m87-07asec-2500.fits ' \
