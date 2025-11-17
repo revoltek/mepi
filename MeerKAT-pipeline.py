@@ -372,6 +372,13 @@ else:
 casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
               gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
 
+# Standard flagging for shadowing, zero-clip, and auto-correlation
+casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
+casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
+casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
+casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
+os.system(f"{aoflagger_command} -strategy {aoflagger_strategy} -column CORRECTED_DATA {tgtms}")
+
 # Split the target averaged in freq and time
 logger.info('Splitting target avg...')
 if not os.path.exists(tgtavgms):
@@ -381,11 +388,6 @@ if not os.path.exists(tgtavgms):
 else:
        logger.info('Target has already been split previously')
 
-# Standard flagging for shadowing, zero-clip, and auto-correlation
-casa.flagdata(vis=tgtavgms, flagbackup=False, mode='shadow')
-casa.flagdata(vis=tgtavgms, flagbackup=False, mode='manual', autocorr=True)
-casa.flagdata(vis=tgtavgms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
-casa.flagdata(vis=tgtavgms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
