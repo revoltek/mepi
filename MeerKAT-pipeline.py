@@ -388,7 +388,6 @@ if not os.path.exists(tgtavgms):
 else:
        logger.info('Target has already been split previously')
 
-
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
 casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
