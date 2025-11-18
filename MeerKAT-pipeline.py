@@ -21,6 +21,7 @@ ref_ant = 'm003'
 #script_dir = os.path.dirname(os.path.abspath(__file__))
 script_dir = '.'
 aoflagger_strategy = os.path.join(script_dir, 'aoflagger_StokesQUV.lua')
+rfimask = os.path.join(script_dir, 'meerkat.rfimask.npy') # ok for UHF and L
 spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command - this range is for band=S1
 freqbin = 1 # number of channel to average for the target split
 timebin = '0s' # time binning for the target split
@@ -194,6 +195,7 @@ casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)#, clipminmax=[0.0, 100.0])
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
+if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 {calms}")
 
 # Set flux density scale
 for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
@@ -377,6 +379,7 @@ casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
+if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 {tgtms}")
 os.system(f"{aoflagger_command} -strategy {aoflagger_strategy} -column CORRECTED_DATA {tgtms}")
 
 # Split the target averaged in freq and time
