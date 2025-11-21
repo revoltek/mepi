@@ -396,11 +396,14 @@ else:
 casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
 for i in range(30):
     # ok for m87 sband
-    os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{i} -reorder -parallel-deconvolution 1024 -parallel-reordering 5 \
-          -parallel-gridding 64 -update-model-required -weight briggs -0.2 -size 2500 2500 \
-          -scale {pixelscale}arcsec -channels-out 6 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels \
-          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 -fit-spectral-pol 3 -fits-mask m87-07asec-2500.fits \
-          -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
+    os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{i}  -update-model-required -pol I \
+          -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
+          -size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2  -minuv-l 80.0 \
+          -niter 1000000 -mgain 0.7 \
+          -join-channels -channels-out 6 -fit-spectral-pol 3 \
+          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
+          -auto-threshold 3 -fits-mask m87-07asec-2500.fits \
+          {tgtavgms} > wsclean_{Targets}-selfcal.log')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %i, solint='32s', refant=ref_ant, gaintype='K', parang=False)
     # plotms(vis='CASA_Tables/selfcal%02i.K' %i, coloraxis='antenna1', xaxis='time', yaxis='delay')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %i, calmode='p', solint='8s', refant=ref_ant, parang=False,
@@ -414,22 +417,23 @@ for i in range(30):
                   gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i, 'CASA_Tables/selfcal%02i.Ga' %i])
 
 # pol cleaning - possible problem with -squared-channel-joining when using -multiscale
-os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -reorder -parallel-deconvolution 1024 -parallel-reordering 5 \
-          -parallel-gridding 64 -update-model-required -weight briggs -0.2 -size 2500 2500 \
-          -scale {pixelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.7 -join-channels -squared-channel-joining \
-          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 -fit-spectral-pol 3 -fits-mask m87-07asec-2500.fits \
-          -auto-threshold 3 {tgtavgms} > wsclean_{Targets}-selfcal.log')
+os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -update-model-required -pol IQUV '
+          f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
+          f'-size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2 -minuv-l 80.0 '
+          f'-niter 1000000 -mgain 0.7 '
+          f'-join-channels -channels-out 6 -fit-spectral-pol 3 -squared-channel-joining '
+          f'-multiscale -multiscale-scales 1,4,8,16,32,64,128,256 '
+          f'-auto-threshold 3 -fits-mask m87-07asec-2500.fits '
+          f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 
-
-os.system('wsclean -name img/m87-test%02i -reorder -parallel-reordering 5 -parallel-gridding 12 '
-    '-j 64 -mem 100 -update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 '
-    '-deconvolution-channels 8 -pol XX,YY -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 '
-    '-join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -fits-mask m87-07asec-2500.fits ' \
-    'MS_Files/m87sband-tgt-avg.MS/' % i)
-
-# aoflagger-setup
-# aoflagger -v -j 32 -strategy meerkat_custom20230417.lua -column CORRECTED_DATA {tgtms}
-
+# wsclean with rm
+restoring_beam = 6.0 # arcsec - this is ok for S1 band
+os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol QU '
+          f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
+          f'-size 1500 1500 -scale 2arcsec -weight briggs -0.5 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
+          f'-niter 25000 -mgain 0.75 -nmiter 12 -no-mf-weighting '
+          f'-join-channels -channels-out 125 -join-polarizations -squared-channel-joining -fit-rm '
+          f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 
 # # DP3
 # import os, glob
