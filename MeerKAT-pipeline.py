@@ -195,7 +195,7 @@ casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)#, clipminmax=[0.0, 100.0])
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
-if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 {calms}")
+if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {calms}")
 
 # Set flux density scale
 for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
@@ -431,22 +431,27 @@ restoring_beam = 6.0 # arcsec - this is ok for S1 band
 os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol QU '
           f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
           f'-size 1500 1500 -scale 2arcsec -weight briggs -0.5 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
-          f'-niter 25000 -mgain 0.75 -nmiter 12 -no-mf-weighting '
+          f'-niter 25000 -mgain 0.75 -nmiter 12 '
           f'-join-channels -channels-out 125 -join-polarizations -squared-channel-joining -fit-rm '
           f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 
 # # DP3
 # import os, glob
+scans = []
+for scan in casa.listobs(tgtavgms):
+    if 'scan' in scan: scans.append(int(scan.split('_')[1]))
+for scan in scans:
+     casa.split(vis = tgtavgms, outputvis = f'{tgtavgms.replace(".MS", f"-scan{scan}.MS")}', field = f"{Targets}", datacolumn = 'data', scan=str(scan))
 # mss = sorted(glob.glob('MS_Files/m87sband-tgt-full-scan*.MS'))
 # for i in range(30):
 #     print(f'Cycle: {i}')
 #     for ms in mss:
 #         print(f'Working on {ms}...')
 #         # solve
-#         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
-#         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
+#         os.system(f'DP3 DP3-sol.parset msin={tgtavgms} msout=. sol.h5parm={tgtavgms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
+#         os.system(f'DP3 DP3-sol.parset msin={tgtavgms} msout=. sol.h5parm={tgtavgms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
 #         # correct
-#         os.system(f'DP3 DP3-cor.parset msin={ms} msout=. cor1.parmdb={ms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
+#         os.system(f'DP3 DP3-cor.parset msin={tgtavgms} msout=. cor1.parmdb={tgtavgms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
 #     # clean
 #     print(f'Cleaning...')
 #     imgname = "img/m87-dp3%02i" % i

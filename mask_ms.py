@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
+
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2016 SKA South Africa
@@ -38,7 +39,7 @@ def main():
     log.info("RFI Masker")
     log.info("Module installed at %s" % pckgdir)
     log.info("----------------------------------------")
-    parser = argparse.ArgumentParser(description="Masks a measurement set for known RFI contaminated channels (version %s)" % (version.__version__))
+    parser = argparse.ArgumentParser(description="Masks a measurement set for known RFI contaminated channels.")
     parser.add_argument("ms", metavar="ms", type=str, nargs="+",
                         help="specify one or more measurement sets to flag")
     parser.add_argument("-m", "--mask", type=str, required=True,
@@ -62,7 +63,7 @@ def main():
         if val == "":
             return None
         elif re.match(r"^(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?~(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$", val):
-            return map(float,val.split("~"))
+            return tuple(map(float, val.split("~")))
         else:
             raise argparse.ArgumentError("Value must be range or blank")
 
@@ -79,7 +80,7 @@ def main():
     # Load mask
     try:
         mask = np.load(args.mask)
-        if mask.dtype[0] != np.bool or \
+        if mask.dtype[0] != bool or \
            mask.dtype[1] != np.float64:
            raise RuntimeError("Invalid")
     except:
