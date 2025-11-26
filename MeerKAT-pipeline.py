@@ -3,7 +3,7 @@
 best is to run this script by copypasting in ipython3
 """
 
-import os, sys, logging
+import os, sys, logging, glob
 import casatasks as casa
 from casatools import msmetadata
 from casatools import table
@@ -20,8 +20,8 @@ ref_ant = 'm003'
 # Set aoflagger_strategy as a file in the same directory as this script
 #script_dir = os.path.dirname(os.path.abspath(__file__))
 script_dir = '.'
-aoflagger_strategy = os.path.join(script_dir, 'aoflagger_StokesQUV.lua')
-rfimask = os.path.join(script_dir, 'meerkat.rfimask.npy') # ok for UHF and L
+aoflagger_strategy = os.path.join(script_dir, 'parsets/aoflagger_StokesQUV.lua')
+rfimask = os.path.join(script_dir, 'parsets/meerkat.rfimask.npy') # ok for UHF and L
 spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command - this range is for band=S1
 freqbin = 1 # number of channel to average for the target split
 timebin = '0s' # time binning for the target split
@@ -435,25 +435,26 @@ os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol QU
           f'-join-channels -channels-out 125 -join-polarizations -squared-channel-joining -fit-rm '
           f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 
-# # DP3
-# import os, glob
+######################################################################
+# Selfcal with DP3 - as an alternative method
+# NOTE: DP3 still not work on multi-scan obs
 scans = []
 for scan in casa.listobs(tgtavgms):
     if 'scan' in scan: scans.append(int(scan.split('_')[1]))
 for scan in scans:
      casa.split(vis = tgtavgms, outputvis = f'{tgtavgms.replace(".MS", f"-scan{scan}.MS")}', field = f"{Targets}", datacolumn = 'data', scan=str(scan))
-# mss = sorted(glob.glob('MS_Files/m87sband-tgt-full-scan*.MS'))
-# for i in range(30):
-#     print(f'Cycle: {i}')
-#     for ms in mss:
-#         print(f'Working on {ms}...')
-#         # solve
-#         os.system(f'DP3 DP3-sol.parset msin={tgtavgms} msout=. sol.h5parm={tgtavgms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
-#         os.system(f'DP3 DP3-sol.parset msin={tgtavgms} msout=. sol.h5parm={tgtavgms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
-#         # correct
-#         os.system(f'DP3 DP3-cor.parset msin={tgtavgms} msout=. cor1.parmdb={tgtavgms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
-#     # clean
-#     print(f'Cleaning...')
+mss = sorted(glob.glob(f'{tgtavgms.replace(".MS", "")}-scan*.MS'))
+for i in range(30):
+     print(f'Cycle: {i}')
+     for ms in mss:
+         print(f'Working on {ms}...')
+         # solve
+         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
+         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
+         # correct
+         os.system(f'DP3 DP3-cor.parset msin={ms} msout=. cor1.parmdb={ms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
+     # clean
+     print(f'Cleaning...')
 #     imgname = "img/m87-dp3%02i" % i
 #     os.system("rm -r wsclean_concat.MS")
 #     os.system(f"taql select from {mss} giving wsclean_concat.MS as plain")

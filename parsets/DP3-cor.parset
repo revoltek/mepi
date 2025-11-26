@@ -1,0 +1,16 @@
+msin =
+msin.datacolumn = DATA
+msout = .
+msout.datacolumn = CORRECTED_DATA
+
+steps = [cor1, cor2]
+
+cor1.type = correct
+cor1.parmdb =
+cor1.correction = phase000
+cor1.missingantennabehavior = unit
+
+cor2.type = correct
+cor2.parmdb =
+cor2.correction = amplitude000
+cor2.missingantennabehavior = unit

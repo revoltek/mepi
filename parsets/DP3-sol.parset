@@ -1,0 +1,17 @@
+msin =
+msin.datacolumn = DATA
+msout = .
+
+steps = [sol]
+
+sol.type = ddecal
+sol.solveralgorithm = directioniterative
+sol.uvlambdamin = 100
+sol.minvisratio = 0.3
+sol.mode = diagonal
+sol.maxiter = 300
+sol.tolerance = 1e-3
+sol.propagatesolutions = True
+sol.propagateconvergedonly = True
+sol.modeldatacolumns = [MODEL_DATA]
+sol.smoothnessconstraint = 10e6
