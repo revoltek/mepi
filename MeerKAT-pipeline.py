@@ -22,6 +22,9 @@ ref_ant = 'm003'
 script_dir = '.'
 aoflagger_strategy = os.path.join(script_dir, 'parsets/aoflagger_StokesQUV.lua')
 rfimask = os.path.join(script_dir, 'parsets/meerkat.rfimask.npy') # ok for UHF and L
+losoto_parset = os.path.join(script_dir, 'parsets/losoto.parset')
+dp3_sol_parset = os.path.join(script_dir, 'parsets/DP3-sol.parset')
+dp3_cor_parset = os.path.join(script_dir, 'parsets/DP3-cor.parset')
 spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command - this range is for band=S1
 freqbin = 1 # number of channel to average for the target split
 timebin = '0s' # time binning for the target split
@@ -449,10 +452,12 @@ for i in range(30):
      for ms in mss:
          print(f'Working on {ms}...')
          # solve
-         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
-         os.system(f'DP3 DP3-sol.parset msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
+         os.system(f'DP3 {dp3_sol_parset} msin={ms} msout=. sol.h5parm={ms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
+         os.system(f'DP3 {dp3_sol_parset} msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
+         # losoto
+         os.system(f'losoto {ms}/ph-{i}.h5 {losoto_parset} >> losoto.log')
          # correct
-         os.system(f'DP3 DP3-cor.parset msin={ms} msout=. cor1.parmdb={ms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
+         os.system(f'DP3 {dp3_cor_parset} msin={ms} msout=. cor1.parmdb={ms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
      # clean
      print(f'Cleaning...')
 #     imgname = "img/m87-dp3%02i" % i
