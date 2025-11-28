@@ -22,7 +22,7 @@ ref_ant = 'm003'
 script_dir = '.'
 aoflagger_strategy = os.path.join(script_dir, 'parsets/aoflagger_StokesQUV.lua')
 rfimask = os.path.join(script_dir, 'parsets/meerkat.rfimask.npy') # ok for UHF and L
-losoto_parset = os.path.join(script_dir, 'parsets/losoto.parset')
+losoto_parset = os.path.join(script_dir, 'parsets/losoto-plot.parset')
 dp3_sol_parset = os.path.join(script_dir, 'parsets/DP3-sol.parset')
 dp3_cor_parset = os.path.join(script_dir, 'parsets/DP3-cor.parset')
 spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command - this range is for band=S1
@@ -165,6 +165,28 @@ def convert_flux_model(nu=None, a=1, b=0, c=0, d=0, Reffreq=1.0e9):
     S = 10**(a + b*np.log10(nu/MHz) + c*np.log10(nu/MHz)**2 + d*np.log10(nu/MHz)**3)
     return fit_flux_model(nu, S, Reffreq, np.ones_like(nu), sref=1, order=3)
 
+def print_flags(vis):
+    ##############
+    # Print flagging summary
+    ##############
+    logger.info('Flagging summary for %s:' % vis)
+    s = casa.flagdata(vis=vis, mode='summary')
+    # Print per-antenna flags on one line
+    ant_flags = ', '.join([f"{ant}: {100.0*info.get('flagged', 0)/info.get('total', 0):.1f}%" 
+                           for ant, info in s['antenna'].items()])
+    print(f"Antenna flags: {ant_flags}")
+    
+    # Print per-scan flags on one line
+    scan_flags = ', '.join([f"{scan}: {100.0*info.get('flagged', 0)/info.get('total', 0):.1f}%" 
+                           for scan, info in sorted(s['scan'].items(), key=lambda x: int(x[0]))])
+    print(f"Scan flags: {scan_flags}")
+    
+    # Print total flags percentage
+    total_flagged = s.get('flagged', 0)
+    total_points = s.get('total', 0)
+    total_pct = 100.0 * total_flagged / total_points if total_points > 0 else 0
+    print(f"Total flags: {total_flagged}/{total_points} ({total_pct:.2f}%)")
+    
 ##############################
 # Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap
 t=table(invis+'/FEED', nomodify=False)
@@ -181,6 +203,7 @@ if not os.path.exists(calms):
        logger.info(f'Calibrators split and saved in {calms}')
 else:
        logger.info('Calibrators have already been split previously')
+print_flags(calms)
 
 # field ids for imaging
 msmd = msmetadata()
@@ -199,6 +222,7 @@ casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)#, clipminmax=[0.0, 100.0])
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {calms}")
+print_flags(calms)
 
 # Set flux density scale
 for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
@@ -247,6 +271,7 @@ casa.flagdata(vis=calms, mode='extend', field=CalibFields,
         extendpols=True, growtime=80., growfreq=80., growaround=False,
         flagneartime=False, flagnearfreq=False, action='apply',
         flagbackup=False, overwrite=True, writeflags=True)
+print_flags(calms)
 
 ### Basic calibration
 for cc in range(2):
@@ -270,21 +295,24 @@ for cc in range(2):
     # Restore original falgs
     casa.flagmanager(vis=calms, mode='restore', versionname='PreCal')
 
-    # DEBUG:
-    casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['B_tab']], flagbackup=False)
-    os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp.png' {calms}")
-    os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph.png' {calms}")
-    ###
-    
-    # Flag with AOFlagger
-    casa.flagmanager(vis = calms, mode = 'save', versionname = f'PreAOFlagger{cc}')
-    # os.system(f"{tricolour_command} -fs total_power -dc CORRECTED_DATA -c {tricolour_strategy}")
-    os.system(f"{aoflagger_command} -strategy {aoflagger_strategy} -column CORRECTED_DATA {calms}")
+    # better flags after first cycle
+    if cc == 0:
+        # DEBUG:
+        casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['B_tab']], flagbackup=False)
+        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp.png' {calms}")
+        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph.png' {calms}")
+        ###
+        
+        # Flag with AOFlagger
+        casa.flagmanager(vis = calms, mode = 'save', versionname = f'PreAOFlagger{cc}')
+        # os.system(f"{tricolour_command} -fs total_power -dc CORRECTED_DATA -c {tricolour_strategy}")
+        os.system(f"{aoflagger_command} -strategy {aoflagger_strategy} -column CORRECTED_DATA {calms}")
+        print_flags(calms)
 
-    # DEBUG:
-    os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp-flag.png' {calms}")
-    os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph-flag.png' {calms}")
-    ###
+        # DEBUG:
+        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp-flag.png' {calms}")
+        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph-flag.png' {calms}")
+        ###
 
 casa.flagmanager(vis = calms, mode = 'save', versionname = f'PrePol')
 
@@ -373,6 +401,7 @@ if not os.path.exists(tgtms):
        logger.info(f'Target split and saved in {tgtms}')
 else:
        logger.info('Target has already been split previously')
+print_flags(tgtms)
 
 casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
               gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
@@ -384,6 +413,7 @@ casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminm
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {tgtms}")
 os.system(f"{aoflagger_command} -strategy {aoflagger_strategy} -column CORRECTED_DATA {tgtms}")
+print_flags(tgtms)
 
 # Split the target averaged in freq and time
 logger.info('Splitting target avg...')
@@ -393,6 +423,7 @@ if not os.path.exists(tgtavgms):
        logger.info(f'Target split and saved in {tgtavgms}')
 else:
        logger.info('Target has already been split previously')
+print_flags(tgtavgms)
 
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
@@ -403,7 +434,7 @@ for i in range(30):
           -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
           -size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2  -minuv-l 80.0 \
           -niter 1000000 -mgain 0.7 \
-          -join-channels -channels-out 6 -fit-spectral-pol 3 \
+          -join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 \
           -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
           -auto-threshold 3 -fits-mask m87-07asec-2500.fits \
           {tgtavgms} > wsclean_{Targets}-selfcal.log')
@@ -418,13 +449,14 @@ for i in range(30):
     #casa.bandpass(vis=tgtavgms, caltable='selfcal%02i.B' %i, combine='', solint='300s', gaintable=['selfcal%02i.G' %i, 'selfcal%02i.K' %i], refant='m002', parang=False)
     casa.applycal(vis=tgtavgms, flagbackup=False, parang=True,
                   gaintable=['CASA_Tables/selfcal%02i.K' %i, 'CASA_Tables/selfcal%02i.Gp' %i, 'CASA_Tables/selfcal%02i.Ga' %i])
+    print_flags(tgtavgms)
 
 # pol cleaning - possible problem with -squared-channel-joining when using -multiscale
 os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -update-model-required -pol IQUV '
           f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
           f'-size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2 -minuv-l 80.0 '
           f'-niter 1000000 -mgain 0.7 '
-          f'-join-channels -channels-out 6 -fit-spectral-pol 3 -squared-channel-joining '
+          f'-join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 -squared-channel-joining '
           f'-multiscale -multiscale-scales 1,4,8,16,32,64,128,256 '
           f'-auto-threshold 3 -fits-mask m87-07asec-2500.fits '
           f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
@@ -441,25 +473,29 @@ os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol QU
 ######################################################################
 # Selfcal with DP3 - as an alternative method
 # NOTE: DP3 still not work on multi-scan obs
+casa.applycal(vis=tgtavgms, flagbackup=False, parang=True) # apply parang and split corrected data
 scans = []
 for scan in casa.listobs(tgtavgms):
     if 'scan' in scan: scans.append(int(scan.split('_')[1]))
 for scan in scans:
-     casa.split(vis = tgtavgms, outputvis = f'{tgtavgms.replace(".MS", f"-scan{scan}.MS")}', field = f"{Targets}", datacolumn = 'data', scan=str(scan))
+    casa.split(vis = tgtavgms, outputvis = f'{tgtavgms.replace(".MS", f"-scan{scan}.MS")}', field = f"{Targets}", datacolumn = 'corrected', scan=str(scan))
 mss = sorted(glob.glob(f'{tgtavgms.replace(".MS", "")}-scan*.MS'))
 for i in range(30):
-     print(f'Cycle: {i}')
-     for ms in mss:
+    print(f'Cycle: {i}')
+    for ms in mss:
          print(f'Working on {ms}...')
          # solve
          os.system(f'DP3 {dp3_sol_parset} msin={ms} msout=. sol.h5parm={ms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
          os.system(f'DP3 {dp3_sol_parset} msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
-         # losoto
-         os.system(f'losoto {ms}/ph-{i}.h5 {losoto_parset} >> losoto.log')
          # correct
          os.system(f'DP3 {dp3_cor_parset} msin={ms} msout=. cor1.parmdb={ms}/ph-{i}.h5 cor2.parmdb={ms}/amp-{i}.h5 >> DP3.log')
-     # clean
-     print(f'Cleaning...')
+    # losoto
+    os.system(f'H5parm_collector.py -V -s sol000 -o cal-ph-{i}.h5 '+' '.join([f'{ms}/ph-{i}.h5' for ms in mss]))
+    os.system(f'losoto cal-ph-{i}.h5 {losoto_parset} >> losoto.log && mv plots plots-{i}')
+    os.system(f'H5parm_collector.py -V -s sol000 -o cal-amp-{i}.h5 '+' '.join([f'{ms}/amp-{i}.h5' for ms in mss]))
+    os.system(f'losoto cal-amp-{i}.h5 {losoto_parset} >> losoto.log && mv plots plots-{i}')
+    # clean
+    print(f'Cleaning...')
 #     imgname = "img/m87-dp3%02i" % i
 #     os.system("rm -r wsclean_concat.MS")
 #     os.system(f"taql select from {mss} giving wsclean_concat.MS as plain")
