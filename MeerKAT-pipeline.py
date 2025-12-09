@@ -405,6 +405,7 @@ print_flags(tgtms)
 
 casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
               gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
+print_flags(tgtms)
 
 # Standard flagging for shadowing, zero-clip, and auto-correlation
 casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
@@ -425,6 +426,7 @@ else:
        logger.info('Target has already been split previously')
 print_flags(tgtavgms)
 
+##########################################################################################
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
 casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
@@ -469,6 +471,13 @@ os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol QU
           f'-niter 25000 -mgain 0.75 -nmiter 12 '
           f'-join-channels -channels-out 125 -join-polarizations -squared-channel-joining -fit-rm '
           f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
+# relative I stokes for fractional Pol
+os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol I '
+          f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
+          f'-size 1500 1500 -scale 2arcsec -weight briggs -0.5 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
+          f'-niter 25000 -mgain 0.75 -nmiter 12 '
+          f'-join-channels -channels-out 125 '
+          f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 
 ######################################################################
 # Selfcal with DP3 - as an alternative method
@@ -480,10 +489,20 @@ for scan in casa.listobs(tgtavgms):
 for scan in scans:
     casa.split(vis = tgtavgms, outputvis = f'{tgtavgms.replace(".MS", f"-scan{scan}.MS")}', field = f"{Targets}", datacolumn = 'corrected', scan=str(scan))
 mss = sorted(glob.glob(f'{tgtavgms.replace(".MS", "")}-scan*.MS'))
+#for ms in mss:
+#    os.system(f'wsclean  -predict -padding 1.8 -j 64 -name {imgname} -channels-out 32 {ms} >> wsclean.log')
 for i in range(30):
-    print(f'Cycle: {i}')
+    print(f'Cycle {i}: imaging...')
+    os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{i}  -update-model-required -pol I \
+          -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
+          -size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2  -minuv-l 80.0 \
+          -niter 1000000 -mgain 0.7 \
+          -join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 \
+          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
+          -auto-threshold 3 -fits-mask m87-07asec-2500.fits \
+          {' '.join(mss)} > wsclean_{Targets}-selfcal.log')
     for ms in mss:
-         print(f'Working on {ms}...')
+         print(f'Cycle {i}: Solving+correcting {ms}...')
          # solve
          os.system(f'DP3 {dp3_sol_parset} msin={ms} msout=. sol.h5parm={ms}/ph-{i}.h5 sol.mode=diagonalphase sol.solint=1 sol.nchan=1 sol.smoothnessconstraint=10e6 >> DP3.log')
          os.system(f'DP3 {dp3_sol_parset} msin={ms} msout=. sol.h5parm={ms}/amp-{i}.h5 sol.mode=scalaramplitude sol.solint=20 sol.nchan=1 sol.smoothnessconstraint=30e6 >> DP3.log')
@@ -494,14 +513,3 @@ for i in range(30):
     os.system(f'losoto cal-ph-{i}.h5 {losoto_parset} >> losoto.log && mv plots plots-{i}')
     os.system(f'H5parm_collector.py -V -s sol000 -o cal-amp-{i}.h5 '+' '.join([f'{ms}/amp-{i}.h5' for ms in mss]))
     os.system(f'losoto cal-amp-{i}.h5 {losoto_parset} >> losoto.log && mv plots plots-{i}')
-    # clean
-    print(f'Cleaning...')
-#     imgname = "img/m87-dp3%02i" % i
-#     os.system("rm -r wsclean_concat.MS")
-#     os.system(f"taql select from {mss} giving wsclean_concat.MS as plain")
-#     #os.system(f'wsclean -name {imgname} -reorder -parallel-reordering 5 -parallel-gridding 12 -j 64 -mem 100 -no-update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 -deconvolution-channels 8 -pol XX,YY,XY,YX -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 -join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -fits-mask m87-07asec-2500.fits wsclean_concat.MS >> wsclean.log')
-#     os.system(f'wsclean -name {imgname} -reorder -parallel-reordering 5 -parallel-gridding 12 -j 64 -mem 100 -no-update-model-required -weight briggs 0.0 -size 2500 2500 -scale 0.7arcsec -channels-out 454 -deconvolution-channels 8 -pol IQUV -data-column CORRECTED_DATA -niter 10000000 -auto-threshold 2 -gain 0.1 -mgain 0.5 -join-channels -multiscale -fit-spectral-pol 3 -multiscale -no-mf-weighting -join-polarizations -fits-mask m87-07asec-2500.fits wsclean_concat.MS >> wsclean.log')
-#     for ms in mss:
-#         print(f'Predict on {ms}...')
-#         # predict
-#         os.system(f'wsclean  -predict -padding 1.8 -j 64 -name {imgname} -channels-out 461 {ms} >> wsclean.log')
