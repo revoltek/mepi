@@ -4,6 +4,8 @@ import argparse
 import re, glob, sys
 from astropy.io import fits
 import numpy as np
+from astropy import units as u
+from astropy.convolution import convolve_fft
 
 class Channel:
     def __init__(self, filename_q, filename_u, label=""):
@@ -20,8 +22,8 @@ class Channel:
         self.beam = (self.header_q.get('BMAJ', 0.0),
                      self.header_q.get('BMIN', 0.0),
                      self.header_q.get('BPA', 0.0))
-        print(f"{self.label}: Loading channel: Q={filename_q}, U={filename_u} - freq: {self.frequency} - \
-              beam: {self.beam[0]*3600:.2f}\" x {self.beam[1]*3600:.2f}\" @ {self.beam[2]:.2f}°")
+        print(f"{self.label}: Loading channel: Q={filename_q}, U={filename_u} - freq: {self.frequency*1e-6:.0e} MHz - \
+              beam: {self.beam[0]*3600:.0f}\" x {self.beam[1]*3600:.0f}\" @ {self.beam[2]:.1f}°")
 
     def get_rms(self, max_iter=10, sigma_clip=5.0, convergence_tol=0.01):
         """
@@ -80,16 +82,55 @@ class Channel:
     def convolve_to_resolution(self, target_beam):
         """
         Convolve the Q and U images to the target beam resolution.
-        Placeholder function - actual convolution implementation is not provided.
         
         Parameters:
         -----------
         target_beam : tuple
-            Target beam parameters (major, minor, pa)
+            Target beam parameters (major, minor, pa) in degrees
         """
-        print(f"Convolving to target beam: {target_beam} NOT IMPLEMENTED")
-        # Placeholder: actual convolution code would go here
-        pass
+        
+        # Create beam objects
+        current_beam = Beam(major=self.beam[0]*u.deg, 
+                           minor=self.beam[1]*u.deg, 
+                           pa=self.beam[2]*u.deg)
+        target = Beam(major=target_beam[0]*u.deg, 
+                     minor=target_beam[1]*u.deg, 
+                     pa=target_beam[2]*u.deg)
+        
+        # Calculate convolution kernel needed
+        try:
+            convolve_beam = target.deconvolve(current_beam)
+        except ValueError:
+            print(f"{self.label}: Target beam smaller than current beam, skipping convolution")
+            return
+        
+        # Get pixel scale from header
+        pixscale = abs(self.header_q.get('CDELT1', self.header_q.get('CD1_1', 1.0))) * u.deg
+        
+        # Create 2D Gaussian kernel
+        kernel = convolve_beam.as_kernel(pixscale)
+        
+        # Convolve Q and U data
+        
+        # Handle 4D data (squeeze out degenerate axes for convolution)
+        q_2d = np.squeeze(self.data_q)
+        u_2d = np.squeeze(self.data_u)
+        
+        print(f"{self.label}: Convolving from {current_beam.major.to(u.arcsec):.2f} x {current_beam.minor.to(u.arcsec):.2f} to {target.major.to(u.arcsec):.2f} x {target.minor.to(u.arcsec):.2f}")
+        
+        q_convolved = convolve_fft(q_2d, kernel, preserve_nan=True, allow_huge=True)
+        u_convolved = convolve_fft(u_2d, kernel, preserve_nan=True, allow_huge=True)
+        
+        # Restore original shape
+        self.data_q = q_convolved.reshape(self.data_q.shape)
+        self.data_u = u_convolved.reshape(self.data_u.shape)
+        
+        # Update beam parameters in headers
+        self.beam = target_beam
+        for header in [self.header_q, self.header_u]:
+            header['BMAJ'] = target_beam[0]
+            header['BMIN'] = target_beam[1]
+            header['BPA'] = target_beam[2]
 
 def create_cube(data_list, outputfile, header):
     """
@@ -97,15 +138,20 @@ def create_cube(data_list, outputfile, header):
     Stacks 4D cubes along the frequency axis (axis 3 in FITS).
     Preserves the degenerate Stokes axis (axis 4 in FITS).
     """
+    for i, data in enumerate(data_list):
+        data_list[i] = data[0, 0, :, :]  # Extract spatial plane (ny, nx)
     # Stack along frequency axis
     cube_data = np.stack(data_list, axis=0)
     
     # Reshape to 4D: (1, 1, ny, nx) -> (1, nfreq, ny, nx)
     # Then transpose to FITS order: (1, 1, ny, nx, nfreq) requires shape (1, 1, ny, nx) repeated
-    # FITS axis order is (naxis4, naxis3, naxis2, naxis1) = (freq, stokes, dec, ra)
-    # NumPy order is reversed: (freq, stokes, ny, nx)
+    # FITS axis order is (naxis4, naxis3, naxis2, naxis1) = (stokes, freq, dec, ra)
+    # NumPy order is reversed: (stokes, freq, ny, nx)
     cube_data = cube_data[np.newaxis, :, :, :]  # (1, nfreq, ny, nx)
     
+    nfreq = cube_data.shape[1]
+    header['NAXIS3'] = nfreq
+
     hdu = fits.PrimaryHDU(cube_data, header=header)
     hdu.writeto(outputfile, overwrite=True)
     print(f"Created cube: {outputfile} with shape {cube_data.shape}")
@@ -115,7 +161,7 @@ def main():
         description="Organize WSClean Stokes Q and U images, optionally normalize by Stokes I"
     )
     parser.add_argument("name_qu", type=str, help="Base name for Q/U files (e.g., 'img/test')")
-    parser.add_argument("--name-i", "-i", help="Name for Stokes I files (e.g. 'img/testI')")
+    #parser.add_argument("--name-i", "-i", help="Name for Stokes I files (e.g. 'img/testI')")
     parser.add_argument("--output", "-o", default="", help="Base name for output files or use StokesQ.fits and StokesU.fits")
     parser.add_argument("--freq-file", "-f", default="", help="Output file for frequency list")
     parser.add_argument("--noise-file", "-n", default="", help="Estimate noise per channel and create noise files")
@@ -133,16 +179,20 @@ def main():
 
     # Collect and move Q files
     pattern_q = re.compile(f"{re.escape(args.name_qu)}-(\d+)-Q-image\.fits")
-    pattern_u = re.compile(f"{re.escape(args.name_qu)}-(\d+)-U-image\.fits")
     channels = []
-
     for filename in sorted(glob.glob(f"{args.name_qu}*.fits")):
         match_q = pattern_q.match(filename)
-        match_u = pattern_u.match(filename)
-        if match_q and match_u:
-            channels.append(Channel(match_q.group(0), match_u.group(0), label=filename))
+        if match_q:
+            filename_q = filename
+            filename_u = re.sub(r"-Q-image\.fits$", "-U-image.fits", filename)
+            channels.append(Channel(filename_q, filename_u, label=filename))
      
+    if len(channels) == 0:
+        print("No Q/U files found matching the pattern.")
+        sys.exit(1)
+
     if args.convolve:
+        from radio_beam import Beam
         print("Convolving channels to common resolution...")
         target_beam = max([ch.beam for ch in channels], key=lambda b: b[0])  # Max major axis
         for channel in channels:
@@ -164,9 +214,16 @@ def main():
             std_noise = np.std(noises)
             threshold = mean_noise + args.flag * std_noise
             print(f"Flagging channels with noise above {threshold:.6e} (mean: {mean_noise:.6e}, std: {std_noise:.6e})")
+            flagged_indices = []
             for i, noise in enumerate(noises):
                 if noise > threshold:
                     print(f"Flagging channel {i} with noise {noise:.6e}")
+                    flagged_indices.append(i)
+            
+            # Remove flagged channels in reverse order to preserve indices
+            for i in reversed(flagged_indices):
+                channels.pop(i)
+                noises.pop(i)
 
     print("Creating Stokes Q and U cubes...")
     create_cube([channel.data_q for channel in channels], output_q, channels[0].header_q)
