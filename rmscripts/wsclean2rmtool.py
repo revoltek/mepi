@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import argparse
 import re, glob, sys
@@ -6,6 +6,7 @@ from astropy.io import fits
 import numpy as np
 from astropy import units as u
 from astropy.convolution import convolve_fft
+from radio_beam import Beam
 
 class Channel:
     def __init__(self, filename_q, filename_u, label=""):
@@ -91,11 +92,16 @@ class Channel:
         
         # Create beam objects
         current_beam = Beam(major=self.beam[0]*u.deg, 
-                           minor=self.beam[1]*u.deg, 
-                           pa=self.beam[2]*u.deg)
+                   minor=self.beam[1]*u.deg, 
+                   pa=self.beam[2]*u.deg)
         target = Beam(major=target_beam[0]*u.deg, 
-                     minor=target_beam[1]*u.deg, 
-                     pa=target_beam[2]*u.deg)
+                 minor=target_beam[1]*u.deg, 
+                 pa=target_beam[2]*u.deg)
+        
+        # Check if beams are equal
+        if current_beam == target:
+            print(f"{self.label}: Current beam already matches target beam, skipping convolution")
+            return
         
         # Calculate convolution kernel needed
         try:
@@ -192,7 +198,6 @@ def main():
         sys.exit(1)
 
     if args.convolve:
-        from radio_beam import Beam
         print("Convolving channels to common resolution...")
         target_beam = max([ch.beam for ch in channels], key=lambda b: b[0])  # Max major axis
         for channel in channels:

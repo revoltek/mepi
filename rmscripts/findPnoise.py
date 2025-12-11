@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import argparse
 import sys
@@ -74,6 +74,9 @@ def main():
     """Main function."""
     args = parse_arguments()
     
+    if not "FDF_tot_dirty.fits" in args.input_cube:
+        print("WARNING: Input cube filename should end with: 'FDF_tot_dirty.fits'")
+
     # Load data
     print(f"Loading RM cube: {args.input_cube}")
     data, wcs = load_data(args.input_cube)
