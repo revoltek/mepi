@@ -9,6 +9,8 @@ def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Derive RM synthesis parameters from measurement set')
     parser.add_argument('ms_path', help='Path to measurement set')
+    parser.add_argument('--effective-channels', '-e', type=int, default=None,
+                       help='Group channels into this many effective channels (uniformly distributed in frequency)')
     return parser.parse_args()
 
 def read_ms_spectral_info(ms_path):
@@ -33,6 +35,24 @@ def read_ms_spectral_info(ms_path):
     except Exception as e:
         print(f"Error reading measurement set {ms_path}: {e}")
         sys.exit(1)
+
+def group_into_effective_channels(frequencies, n_effective):
+    """Group frequencies into effective channels uniformly distributed."""
+    if n_effective >= len(frequencies):
+        print(f"Warning: Requested {n_effective} effective channels >= actual {len(frequencies)} channels")
+        return frequencies
+    
+    freq_min = frequencies.min()
+    freq_max = frequencies.max()
+    
+    # Create uniformly spaced effective frequencies
+    effective_frequencies = np.linspace(freq_min, freq_max, n_effective)
+    
+    print(f"Grouped {len(frequencies)} channels into {n_effective} effective channels")
+    print(f"Original frequency spacing: {np.median(np.diff(frequencies))/1e6:.2f} MHz")
+    print(f"Effective frequency spacing: {np.median(np.diff(effective_frequencies))/1e6:.2f} MHz")
+    
+    return effective_frequencies
 
 def calculate_rm_parameters(frequencies):
     """Calculate RM synthesis parameters from frequency array."""
@@ -115,6 +135,11 @@ def main():
     
     # Read frequency information
     frequencies = read_ms_spectral_info(args.ms_path)
+    
+    # Group into effective channels if requested
+    if args.effective_channels is not None:
+        print(f"\nGrouping into {args.effective_channels} effective channels:")
+        frequencies = group_into_effective_channels(frequencies, args.effective_channels)
     
     # Calculate RM parameters
     params = calculate_rm_parameters(frequencies)

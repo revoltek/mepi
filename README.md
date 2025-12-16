@@ -21,45 +21,49 @@ plots are done with shadems https://github.com/ratt-ru/shadeMS
 
 ## Wsclean
 
+First see the expected parameters of the RM synthesis. The `-e` option is the same of the `-channels-out` in `wsclean`:
+
+`RMparms.py -e XXX XXX.MS`
+
+**note**: A large number of channel is useful to flag narrow frequency ranges that are bad, this is important in Lband. Also having a large number of channels is useful in regions with high S/N to get a more precise RM and P. Otherwise enough channels to have a larger range than the `-l` in the `rmsynth3d` is the only requirement.
+
+Example:
+
+`wsclean -j 64 -name img/xxx -no-update-model-required -pol QU -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 -size 1500 1500 -scale 2arcsec -weight briggs -0.5 -minuv-l 80.0 -beam-size XXX -taper-gaussian XXXarcsec -niter 25000 -mgain 0.75 -nmiter 12 -join-channels -channels-out XXX -join-polarizations -squared-channel-joining -fit-rm XXX.MS > wsclean_QU.log`
+
+**note**: best would be not to force a common restoring beam (and no tapering) but to convolve in the preprocess to the same beam
 Note:
 * Use -fit-rm
 * Use -squared-channel-join
 * Do not use -multiscale (it cannot work with square channel join)
 
-**todo**: find the right number of channels, larger than needed so flagging is better, important in Lband, ideally a factor 3-4 larger than the -s later
-rm_max = sqrt(3)/deltaLmabda**2 (a freq + basse)
-
-Example:
-`wsclean -j 64 -name img/xxx -no-update-model-required -pol QU -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 -size 1500 1500 -scale 2arcsec -weight briggs -0.5 -minuv-l 80.0 -beam-size XXX -taper-gaussian XXXarcsec -niter 25000 -mgain 0.75 -nmiter 12 -join-channels -channels-out XXX -join-polarizations -squared-channel-joining -fit-rm XXX.MS > wsclean_QU.log`
-
-**note**: best would be not to force a common restoring beam (and no tapering) but to convolve in the preprocess to the same beam
-
 ## Preprocess
-create cubes, freq and noise files and flag bad chans:
-`wsclean2rmtool.py -f freqs.dat -n noise.dat --flag 5 ../IMG/xxx`
+create cubes, freq and noise files and flag bad chans and flag channes with an outlier major axis beam (check the histograms):
+`wsclean2rmtool.py -f freqs.dat -n noise.dat --flag 5 --flag-beam 5 ../IMG/xxx`
 
-TODO: rebin of images
-TODO: add histogram of noise and beam size
-TODO: add a check on the beam size to exclude those that are too large
+TODO: possible rebin of images
 
 ## Do synthesis + clean
-input: FITS files, and an ASCII file containing a list of channel frequencies
-
-todo: add noise, add spidx, define -l and -s properly
-
+input: FITS files, an ASCII file containing a list of channel frequencies and an ASCII file containing a list of noises
+Decide carefully the -l based on the desired outcome and expectations, -s can be reduced from 10
 https://github.com/CIRADA-Tools/RM-Tools/wiki/RMsynth3D
-`rmsynth3d -v -l 200 -s 10 -o rmtoolsynth StokesQ.fits StokesU.fits freqs.dat`
 
--r? Optimise the resolution of the RMSF (as per Rudnick & Cotton).
+`rmsynth3d -v -l 200 -s 10 -n noise.dat -v variance -o rmtoolsynth StokesQ.fits StokesU.fits freqs.dat`
+
+TODO: add spidx?
+TODO: add -r? Optimise the resolution of the RMSF (as per Rudnick & Cotton).
 
 Find the noise in P to limit the clean, the region should be away from sources:
+
 `findPnoise.py rmtoolsynthFDF_tot_dirty.fits region.reg`
 
 Do clean, set the noise to 6x the output of the previous script
+
 `rmclean3d -v --ncores 64 -o rmtoolclean -c xxx rmtoolsynthFDF_tot_dirty.fits rmtoolsynthRMSF_tot.fits`
 
 ## Postprocess
 create the smoothed RM map + angle map
+
 `rmtools_peakfitcube -v -p rmtoolsynthFDF_tot_dirty.fits freqs.dat rmtoolpfc`
 
 Output:
