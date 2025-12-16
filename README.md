@@ -1,4 +1,4 @@
-# mepi
+# MeerKAT Pipeline (MePi)
 
 A container file with all required softwares and packages can be found at docker://tpasini/pol_meerkat:latest
 
@@ -17,13 +17,14 @@ the script writes the output in the CORRECTED_DATA column and needs to be run fo
 
 plots are done with shadems https://github.com/ratt-ru/shadeMS
 
-### RM
+# RM
 
 ## Wsclean
 
-Use -fit-rm
-Use -squared-channel-join
-Do not use -multiscale (it cannot work with square channel join)
+Note:
+* Use -fit-rm
+* Use -squared-channel-join
+* Do not use -multiscale (it cannot work with square channel join)
 
 **todo**: find the right number of channels, larger than needed so flagging is better, important in Lband, ideally a factor 3-4 larger than the -s later
 rm_max = sqrt(3)/deltaLmabda**2 (a freq + basse)
