@@ -39,6 +39,7 @@ Note:
 
 ## Preprocess
 create cubes, freq and noise files and flag bad chans and flag channes with an outlier major axis beam (check the histograms):
+
 `wsclean2rmtool.py -f freqs.dat -n noise.dat --flag 5 --flag-beam 5 ../IMG/xxx`
 
 TODO: possible rebin of images
@@ -50,8 +51,7 @@ https://github.com/CIRADA-Tools/RM-Tools/wiki/RMsynth3D
 
 `rmsynth3d -v -l 200 -s 10 -n noise.dat -v variance -o rmtoolsynth StokesQ.fits StokesU.fits freqs.dat`
 
-TODO: add spidx?
-TODO: add -r? Optimise the resolution of the RMSF (as per Rudnick & Cotton).
+TODO: add spidx? add -r? Optimise the resolution of the RMSF (as per Rudnick & Cotton).
 
 Find the noise in P to limit the clean, the region should be away from sources:
 
@@ -67,6 +67,7 @@ create the smoothed RM map + angle map
 `rmtools_peakfitcube -v -p rmtoolsynthFDF_tot_dirty.fits freqs.dat rmtoolpfc`
 
 Output:
+
 **ampPeakPIfitEff** and **dAmpPeakPIfit**: Polarized intensity found by fitting the peak. Corrected for polarization bias if snrPIfit > 5. Correction formula is PI_eff = sqrt(PI^2 - 2.3*dFDFth^2). And error in polarized intensity.
 
 **polAngle0Fit_deg** and **dPolAngle0Fit_deg**: Derotated polarization angle (i.e. the angle at the point of emission), calculated by subtracting phiPeakPIfit_rm2*lam0Sq_m2 from the polarization angle above and error.
