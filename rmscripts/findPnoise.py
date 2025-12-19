@@ -40,20 +40,27 @@ def extract_noise_data(data, wcs, regions):
     """Extract noise data from specified regions."""
     noise_arrays = []
     
-    for region in regions:
-        # Convert region to pixel coordinates
-        pixel_region = region.as_imagecoord(header=wcs.to_header())
-        
-        # Create mask for this region
-        mask = pixel_region.get_mask(shape=data.shape[-2:])
-        
-        # Extract low and high RM data for this region
-        # Assuming RM axis is axis=1 (modify if different)
-        low_rm_data = data[0, :250, mask]
-        high_rm_data = data[0, -250:, mask]
-        
-        noise_arrays.extend([low_rm_data.flatten(), high_rm_data.flatten()])
+    # Get the 2D spatial dimensions for masking
+    spatial_shape = data.shape[-2:]  # (ny, nx)
     
+    # Create a dummy HDU with the spatial shape and WCS
+    dummy_data = np.zeros(spatial_shape)
+    dummy_hdu = fits.PrimaryHDU(data=dummy_data, header=wcs.to_header())
+        
+    # Get mask from all regions
+    mask = regions.get_mask(dummy_hdu)
+        
+    # Extract low and high RM data for all regions combined
+    # Assuming RM axis is axis=1 (modify if different)
+    low_rm_data = data[0, :250, mask]
+    high_rm_data = data[0, -250:, mask]
+        
+    noise_arrays.extend([low_rm_data.flatten(), high_rm_data.flatten()])
+    
+    if len(noise_arrays) == 0:
+        print("Error: No valid regions found or processed")
+        sys.exit(1)
+        
     return np.concatenate(noise_arrays)
 
 def calculate_noise_stats(noise_data):
@@ -93,7 +100,8 @@ def main():
     
     # Print results
     print(f"Number of noise samples: {len(noise_data)}")
-    print(f"RM cube noise=({noise_median:.9f}±{noise_std:.9f}) - error can be used in the '-c' option in rmclean3d")
+    print(f"RM cube noise=({noise_median:.9f}±{noise_std:.9f})")
+    print(f"In rmclean3d one can use 6x sigma = {6 * noise_std:.9f} in the -c option")
 
 if __name__ == "__main__":
     main()

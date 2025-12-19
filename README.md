@@ -59,7 +59,7 @@ Find the noise in P to limit the clean, the region should be away from sources:
 
 Do clean, set the noise to 6x the output of the previous script
 
-`rmclean3d -v --ncores 64 -o rmtoolclean -c xxx rmtoolsynthFDF_tot_dirty.fits rmtoolsynthRMSF_tot.fits`
+`rmclean3d -v --ncores 64 --chunk 10000 -o rmtoolclean -c xxx rmtoolsynthFDF_tot_dirty.fits rmtoolsynthRMSF_tot.fits`
 
 ## Postprocess
 create the smoothed RM map + angle map

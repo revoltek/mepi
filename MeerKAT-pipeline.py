@@ -262,10 +262,10 @@ casa.flagmanager(vis=calms, mode='save', versionname='PreCal')
 # Run TFCrop on the DATA column
 logger.info('Running TFCrop...')
 casa.flagdata(vis=calms, mode='tfcrop', field=CalibFields,
-        ntime='scan', timecutoff=5.0, freqcutoff=5.0, timefit='line',
+        datacolumn='data', ntime='scan', timecutoff=5.0, freqcutoff=5.0, timefit='line',
         freqfit='line', extendflags=False, timedevscale=5., freqdevscale=5.,
-        extendpols=True, growaround=False, action='apply', flagbackup=False,
-        overwrite=True, writeflags=True, datacolumn='DATA')
+        extendpols=True, growaround=False, action='apply',
+        flagbackup=False, overwrite=True, writeflags=True)
 casa.flagdata(vis=calms, mode='extend', field=CalibFields,
         datacolumn='data', clipzeros=True, ntime='scan', extendflags=False,
         extendpols=True, growtime=80., growfreq=80., growaround=False,
