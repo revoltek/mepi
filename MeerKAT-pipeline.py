@@ -282,15 +282,15 @@ for cc in range(2):
     # Gain calibration (fast to track the ionosphere)
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Gp_tab'], gaintype='G', calmode='p', 
                  gaintable=[tab['K_tab']], refant=ref_ant, solint='8s')
-    casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Ga_tab'], gaintype='G', calmode='a', 
-                 gaintable=[tab['K_tab'],tab['Gp_tab']], refant=ref_ant)
     # plotms(vis=tab['Gp_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase')
-    # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
     # one can now combine the scans and use different B as diagnostics
     casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', 
-                  gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']], combine='scan', solint='inf', refant=ref_ant)
+                  gaintable=[tab['K_tab'],tab['Gp_tab']], combine='scan', solint='inf', refant=ref_ant)
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
+    casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Ga_tab'], gaintype='G', calmode='a', 
+                 gaintable=[tab['K_tab'],tab['Gp_tab'],tab['B_tab']], refant=ref_ant)
+    # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
     # Restore original falgs
     casa.flagmanager(vis=calms, mode='restore', versionname='PreCal')

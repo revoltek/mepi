@@ -8,6 +8,11 @@ from astropy import units as u
 from astropy.convolution import convolve_fft
 from radio_beam import Beam
 import matplotlib.pyplot as plt
+from astropy.wcs import WCS
+try:
+    from regions import Regions
+except ImportError:
+    Regions = None
 
 class Channel:
     def __init__(self, filename_q, filename_u, label=""):
@@ -143,6 +148,130 @@ class Channel:
             header['BMIN'] = target_beam[1]
             header['BPA'] = target_beam[2]
 
+    def apply_mask(self, mask):
+        """
+        Crop Q and U data to the minimum bounding box containing the masked regions.
+        Updates headers to reflect the new dimensions and coordinate system.
+        
+        Parameters:
+        -----------
+        mask : numpy.ndarray
+            Boolean mask (True for pixels to keep, False to mask out)
+        """
+        # Find bounding box of the mask
+        rows, cols = np.where(mask)
+        if len(rows) == 0:
+            raise ValueError("Mask contains no True pixels")
+            
+        min_row, max_row = rows.min(), rows.max()
+        min_col, max_col = cols.min(), cols.max()
+        
+        # Extract 2D data from 4D arrays
+        data_q_2d = self.data_q[0, 0, :, :]
+        data_u_2d = self.data_u[0, 0, :, :]
+        
+        # Crop data to bounding box
+        cropped_q = data_q_2d[min_row:max_row+1, min_col:max_col+1]
+        cropped_u = data_u_2d[min_row:max_row+1, min_col:max_col+1]
+        
+        # Reshape back to 4D and update data arrays
+        self.data_q = cropped_q.reshape(1, 1, *cropped_q.shape)
+        self.data_u = cropped_u.reshape(1, 1, *cropped_u.shape)
+        
+        # Update headers to reflect new dimensions and coordinate system
+        self._update_header_for_crop(min_row, max_row, min_col, max_col, mask)
+        
+        print(f"{self.label}: Cropped to bounding box [{min_row}:{max_row+1}, {min_col}:{max_col+1}] - new shape: {cropped_q.shape}")
+        
+    def _update_header_for_crop(self, min_row, max_row, min_col, max_col, original_mask):
+        """
+        Update FITS headers for cropped data, adjusting dimensions and coordinate system.
+        
+        Parameters:
+        -----------
+        min_row, max_row : int
+            Row bounds of the crop region
+        min_col, max_col : int
+            Column bounds of the crop region
+        original_mask : numpy.ndarray
+            Original boolean mask that was applied
+        """
+        # Calculate new dimensions
+        new_naxis1 = max_col - min_col + 1  # X-axis (columns)
+        new_naxis2 = max_row - min_row + 1  # Y-axis (rows)
+        
+        # Update both headers
+        for header in [self.header_q, self.header_u]:
+            # Update image dimensions
+            header['NAXIS1'] = new_naxis1
+            header['NAXIS2'] = new_naxis2
+            
+            # Update coordinate reference pixels
+            # CRPIX values are 1-indexed in FITS
+            if 'CRPIX1' in header:
+                header['CRPIX1'] = header['CRPIX1'] - min_col
+            if 'CRPIX2' in header:
+                header['CRPIX2'] = header['CRPIX2'] - min_row
+                
+            # Add history about cropping
+            header['HISTORY'] = 'Data cropped using DS9 region file'
+            header['HISTORY'] = f'Cropped to [{min_row}:{max_row+1}, {min_col}:{max_col+1}]'
+            header['HISTORY'] = f'Original mask had {np.sum(original_mask)} selected pixels'
+            header['CROPPED'] = (True, 'Data has been cropped to bounding box')
+            
+            # Remove or update statistics keywords if they exist
+            if 'DATAMIN' in header:
+                del header['DATAMIN']
+            if 'DATAMAX' in header:
+                del header['DATAMAX']
+
+def parse_ds9_regions(region_file, wcs):
+    """
+    Parse DS9 region file and create a mask.
+    
+    Parameters:
+    -----------
+    region_file : str
+        Path to DS9 region file
+    wcs : astropy.wcs.WCS
+        World coordinate system for the image (4D with Stokes and frequency axes)
+        
+    Returns:
+    --------
+    mask : numpy.ndarray
+        Boolean mask array (True for pixels inside regions)
+    """
+    if Regions is None:
+        raise ImportError("regions package not available. Install with: pip install regions")
+    
+    # Read the region file
+    regions = Regions.read(region_file, format='ds9')
+    
+    # Create 2D WCS by dropping Stokes and frequency axes
+    wcs_2d = wcs.celestial
+    
+    # Get spatial dimensions from WCS (last two axes in FITS order)
+    ny, nx = wcs_2d.array_shape
+    
+    # Create 2D mask - start with all False (masked out)
+    mask_2d = np.zeros((ny, nx), dtype=bool)
+    
+    # Convert regions to pixel coordinates and create mask
+    for region in regions:
+        # Convert to pixel region using 2D WCS
+        pixel_region = region.to_pixel(wcs_2d)
+        # Get mask for this region
+        region_mask = pixel_region.to_mask(mode='center')
+        if region_mask is not None:
+            # Apply the region mask
+            mask_2d |= region_mask.to_image((ny, nx)).astype(bool)
+    
+    # Expand to 4D mask (broadcast over Stokes and frequency axes)
+    # Shape should be (1, 1, ny, nx) to match the data
+    mask = mask_2d[np.newaxis, np.newaxis, :, :]
+    
+    return mask
+
 def create_cube(data_list, outputfile, header):
     """
     Create a FITS cube from a list of input FITS files.
@@ -210,6 +339,7 @@ def main():
     parser.add_argument("--convolve", "-c", action="store_true", help="Convolve Q/U images to minimum resolution before stacking")
     parser.add_argument("--flag", type=float, default=0, help="Flag channels with noise above this threshold (in sigma) - default:0 (no flagging)")
     parser.add_argument("--flag-beam", type=float, default=0, help="Flag channels with beam major axis outliers above this threshold (in sigma) - default:0 (no flagging)")
+    parser.add_argument("--mask-reg", type=str, default="", help="DS9 region file to mask the data")
 
     args = parser.parse_args()
     
@@ -291,6 +421,28 @@ def main():
             channels.pop(i)
 
     print("Creating Stokes Q and U cubes...")
+    
+    # Apply masking if region file is provided
+    if args.mask_reg:
+        print(f"Applying mask from DS9 region file: {args.mask_reg}")
+        
+        # Create WCS from the first channel header
+        wcs = WCS(channels[0].header_q, naxis=2)
+        
+        # Parse the DS9 region file
+        try:
+            mask = parse_ds9_regions(args.mask_reg, wcs)
+            print(f"Mask created with {np.sum(mask)} pixels selected out of {mask.size} total pixels")
+            
+            # Apply mask to all channels using their apply_mask method
+            for channel in channels:
+                channel.apply_mask(mask)
+            
+        except Exception as e:
+            print(f"Error processing region file: {e}")
+            print("Proceeding without masking...")
+    
+    # Create cubes with (potentially masked) data
     create_cube([channel.data_q for channel in channels], output_q, channels[0].header_q)
     create_cube([channel.data_u for channel in channels], output_u, channels[0].header_u)
     
