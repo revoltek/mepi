@@ -18,8 +18,8 @@ tgtavgms   = 'MS_Files/m87sband-tgt-avg.MS'
 ref_ant = 'm003'
 # tricolour_strategy = 'tricolour_oxkat.yaml'
 # Set aoflagger_strategy as a file in the same directory as this script
-#script_dir = os.path.dirname(os.path.abspath(__file__))
-script_dir = '.'
+script_dir = os.path.dirname(os.path.abspath(__file__))
+#script_dir = '.'
 aoflagger_strategy = os.path.join(script_dir, 'parsets/aoflagger_StokesQUV.lua')
 rfimask = os.path.join(script_dir, 'parsets/meerkat.rfimask.npy') # ok for UHF and L
 losoto_parset = os.path.join(script_dir, 'parsets/losoto-plot.parset')

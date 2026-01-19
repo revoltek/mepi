@@ -80,4 +80,7 @@ Output:
 
 QU fitting canbe run only in 1D
 
+Use the noise derived from `findPnoise.py` to clip all maps, typicially at 6 times.
+`clipmap.py --noise xxx -s 6 -p ampPeakPIfitEff.fits ampPeakPIfitEff.fits phiPeakPIfit_rm2.fits polAngle0Fit_deg.fits`
+
 TODO: tagli, I>3sigma, spettroFaraday>6sigma (calcolato sul cubo dopo il clean usando i canali inizio e fine) - hales2012
