@@ -491,7 +491,7 @@ for scan in scans:
 mss = sorted(glob.glob(f'{tgtavgms.replace(".MS", "")}-scan*.MS'))
 #for ms in mss:
 #    os.system(f'wsclean  -predict -padding 1.8 -j 64 -name {imgname} -channels-out 32 {ms} >> wsclean.log')
-for i in range(30):
+for i in range(10):
     print(f'Cycle {i}: imaging...')
     os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{i}  -update-model-required -pol I \
           -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \

@@ -49,7 +49,7 @@ input: FITS files, an ASCII file containing a list of channel frequencies and an
 Decide carefully the -l based on the desired outcome and expectations, -s can be reduced from 10
 https://github.com/CIRADA-Tools/RM-Tools/wiki/RMsynth3D
 
-`rmsynth3d -v -l 200 -s 10 -n noise.dat -v variance -o rmtoolsynth StokesQ.fits StokesU.fits freqs.dat`
+`rmsynth3d -v -l 200 -s 10 -n noise.dat -w variance -o rmtoolsynth StokesQ.fits StokesU.fits freqs.dat`
 
 TODO: add spidx? add -r? Optimise the resolution of the RMSF (as per Rudnick & Cotton).
 
@@ -83,4 +83,4 @@ QU fitting canbe run only in 1D
 Use the noise derived from `findPnoise.py` to clip all maps, typicially at 6 times.
 `clipmap.py --noise xxx -s 6 -p ampPeakPIfitEff.fits ampPeakPIfitEff.fits phiPeakPIfit_rm2.fits polAngle0Fit_deg.fits`
 
-TODO: tagli, I>3sigma, spettroFaraday>6sigma (calcolato sul cubo dopo il clean usando i canali inizio e fine) - hales2012
+TODO: taglio su I>3sigma - hales2012
