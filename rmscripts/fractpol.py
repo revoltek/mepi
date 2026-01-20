@@ -50,10 +50,22 @@ def main():
         print("Error: Beam shapes are not equal between I and P maps")
         sys.exit(1)
     
-    # Check data shapes match
+    # Check data shapes and handle dimension mismatch
     if i_data.shape != p_data.shape:
-        print(f"Error: Data shapes don't match - I: {i_data.shape}, P: {p_data.shape}")
-        sys.exit(1)
+        # Check if P is 2D and I is 4D with degenerate axes
+        if len(p_data.shape) == 2 and len(i_data.shape) == 4:
+            # Check if first two dimensions of I are degenerate (size 1)
+            if i_data.shape[0] == 1 and i_data.shape[1] == 1:
+                # Expand P to match I's shape
+                p_data = np.expand_dims(np.expand_dims(p_data, axis=0), axis=0)
+                print(f"Expanded P data from {p_data.shape[2:]} to {p_data.shape} to match I data shape")
+            else:
+                print(f"Error: Cannot handle shape mismatch - I: {i_data.shape}, P: {p_data.shape}")
+                print("I data must have degenerate first two dimensions for 2D P expansion")
+                sys.exit(1)
+        else:
+            print(f"Error: Data shapes don't match - I: {i_data.shape}, P: {p_data.shape}")
+            sys.exit(1)
     
     # Calculate fractional polarization P/I
     # Avoid division by zero
