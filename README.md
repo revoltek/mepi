@@ -83,4 +83,7 @@ QU fitting canbe run only in 1D
 Use the noise derived from `findPnoise.py` to clip all maps, typicially at 6 times.
 `clipmap.py --noise xxx -s 6 -p ampPeakPIfitEff.fits ampPeakPIfitEff.fits phiPeakPIfit_rm2.fits polAngle0Fit_deg.fits`
 
+To make a fractional polarisation map one can use
+`fractpol.py I-MFS-image.fits ampPeakPIfitEff-blanked.fits`
+
 TODO: taglio su I>3sigma - hales2012
