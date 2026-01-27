@@ -189,7 +189,7 @@ def print_flags(vis):
     
 ##############################
 # Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap
-t=table(invis+'/FEED', nomodify=False)
+t = table.open(invis+'/FEED', nomodify=False)
 feed_angle = t.getcol('RECEPTOR_ANGLE')
 new_feed_angle = np.zeros(feed_angle.shape)
 t.putcol('RECEPTOR_ANGLE', new_feed_angle)
@@ -292,11 +292,12 @@ for cc in range(2):
                  gaintable=[tab['K_tab'],tab['Gp_tab'],tab['B_tab']], refant=ref_ant)
     # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
-    # Restore original falgs
-    casa.flagmanager(vis=calms, mode='restore', versionname='PreCal')
-
     # better flags after first cycle
     if cc == 0:
+
+        # Restore original falgs
+        casa.flagmanager(vis=calms, mode='restore', versionname='PreCal')
+        
         # DEBUG:
         casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['B_tab']], flagbackup=False)
         os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp.png' {calms}")

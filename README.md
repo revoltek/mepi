@@ -46,7 +46,7 @@ TODO: possible rebin of images
 
 ## Do synthesis + clean
 input: FITS files, an ASCII file containing a list of channel frequencies and an ASCII file containing a list of noises
-Decide carefully the -l based on the desired outcome and expectations, -s can be reduced from 10
+Decide carefully the -l based on the desired outcome and expectations, -s can be reduced from 10. Instead of -s one can define a specific sampling in Faraday space with -d.
 https://github.com/CIRADA-Tools/RM-Tools/wiki/RMsynth3D
 
 `rmsynth3d -v -l 200 -s 10 -n noise.dat -w variance -o rmtoolsynth StokesQ.fits StokesU.fits freqs.dat`
