@@ -289,7 +289,7 @@ for cc in range(2):
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Ga_tab'], gaintype='G', calmode='a', 
-                 gaintable=[tab['K_tab'],tab['Gp_tab'],tab['B_tab']], refant=ref_ant)
+                 gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab']], interp=['linear,linearflag'], refant=ref_ant)
     # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
     # better flags after first cycle
@@ -299,7 +299,7 @@ for cc in range(2):
         casa.flagmanager(vis=calms, mode='restore', versionname='PreCal')
         
         # DEBUG:
-        casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['B_tab']], flagbackup=False)
+        casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']], flagbackup=False)
         os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp.png' {calms}")
         os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph.png' {calms}")
         ###
@@ -324,65 +324,65 @@ os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {B
 
 # Leackage on unpol calib
 casa.polcal(vis=calms,
-   caltable=tab['Df_tab'],field=BandPassCal, poltype='Df', solint='inf', refant=ref_ant, combine='scan',
-   gaintable=[tab['K_tab'], tab['Gp_tab'], tab['Ga_tab'], tab['B_tab']])
+   caltable=tab['Df_tab'],field=BandPassCal, poltype='Df', solint='inf', refant=ref_ant, combine='scan', interp=['linear,linearflag'],
+   gaintable=[tab['B_tab'], tab['K_tab'], tab['Gp_tab'], tab['Ga_tab']])
 # plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
 
 # DEBUG:
-casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab']], flagbackup=False)
+casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['Df_tab']], flagbackup=False)
 os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak.png' {calms}")
 ###
 
 ############################################################################
 # Bootrap secondary calibrator
 logger.info('Bootstrapping secondary calibrator...')
-casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, \
-             gaintable=[tab['Ga_tab'], tab['Gp_tab'], tab['B_tab'], tab['Df_tab']])
+casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab']])
 # plotms(vis=tab['Ksec_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay', xconnector='line')
-casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, \
-             gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab']])
+casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab']])
 # plotms(vis=tab['Gpsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
-casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, \
-             gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab'],tab['Gpsec_tab']]) # scalar as it can be polarised
+casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab']]) # scalar as it can be polarised
 # plotms(vis=tab['Tsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
 # image the secondary and selfcal to improve the local model
 casa.applycal(vis=calms,field=PhaseCal, parang=True, flagbackup=False, \
-              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
+              gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
 os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
           -update-model-required -weight briggs -0.2 -size 8000 8000 \
           -scale {pixelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
           -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {calms} > wsclean_{PhaseCal}-selfcal.log')
 
-casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, \
-             gaintable=[tab['Ga_tab'], tab['Gp_tab'], tab['B_tab'], tab['Df_tab']])
-casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, \
-             gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab']])
+casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab']])
+casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab']])
 # parang=True for polarised sources and Xf should also be applied, otherwise it absorbs part of the effect
-casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, \
-             gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Df_tab'],tab['Gpsec_tab']])
+casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab']])
 
 ##############################################################################
 # Solve for polarization alignment
 logger.info('Solving for polarization alignment...')
 os.system(f"{shadems_command} --xaxis FREQ  --yaxis CORRECTED_DATA --field {PolCal} --corr XY,YX {calms}")
-casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', \
-             gaintable=[tab['Ga_tab'],tab['B_tab'], tab['Df_tab'], tab['Gpsec_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
+casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'],tab['Ga_tab'], tab['Df_tab'], tab['Gpsec_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
 # plotms(vis=tab['Kpol_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
 # here we can use also secT to trace slow variations in the amp
-casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', 
-             gaintable=[tab['Kpol_tab'], tab['Ga_tab'], tab['B_tab'], tab['Df_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
+casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', interp=['linear,linearflag'], 
+             gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
 # plotms(vis=tab['Gppol_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 
 # Xf that is constant within a scan, but it drift slowly with time, try not combining scans
-casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant,
-   combine='', preavg=-1., gaintable=[tab['Kpol_tab'], tab['Ga_tab'], tab['B_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
+casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant, interp=['linear,linearflag'],
+   combine='', preavg=-1., gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
 # plotms(vis=tab['Xf_tab'], xaxis='freq', yaxis='phase')
 
 logger.info('Applying calibration to PolCal and test imaging...')
 # Final applycal to PolCal to check pol quality
 casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, \
-              gaintable=[tab['Kpol_tab'],tab['Ga_tab'],tab['B_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab']])
+              gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab']])
 
 # test image of the polcal - no update model!
 os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
