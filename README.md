@@ -6,7 +6,7 @@ To run the singularity one can use (for instance):
 
 `singularity build ~/MeerKATpol.simg docker://tpasini/pol_meerkat:latest`
 
-`singularity shell --pid --writable-tmpfs --cleanenv -B/homes/fdg,/local/work/fdg,/iranet/groups/ulu/fdg/,/iranet/groups/lofar/containers/ ~/MeerKATpol.simg`
+`singularity shell --pid --writable-tmpfs --cleanenv -B /homes/fdg,/local/work/fdg,/iranet/groups/ulu/fdg/,/iranet/groups/lofar/containers/ ~/MeerKATpol.simg`
 
 For L and S band the data must have X and Y flipped using the script "correct_parang.py" by Ben Hugo
 https://github.com/bennahugo/LunaticPolarimetry/blob/master/correct_parang.py
