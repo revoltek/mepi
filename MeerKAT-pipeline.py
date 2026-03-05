@@ -25,21 +25,21 @@ rfimask = os.path.join(script_dir, 'parsets/meerkat.rfimask.npy') # ok for UHF a
 losoto_parset = os.path.join(script_dir, 'parsets/losoto-plot.parset')
 dp3_sol_parset = os.path.join(script_dir, 'parsets/DP3-sol.parset')
 dp3_cor_parset = os.path.join(script_dir, 'parsets/DP3-cor.parset')
-spw_selection = '0:210~3841' # channel selection - here is what we keep in the split command - this range is for band=S1
+spw_selection = '' # channel selection - here is what we keep in the split command - '0:210~3841' range is for band=S1
 freqbin = 1 # number of channel to average for the target split
 timebin = '0s' # time binning for the target split
 
 FluxCal = 'J1939-6342' # one of the BandPassCals
-BandPassCal = 'J1939-6342,J0408-6545'
+BandPassCal = 'J1939-6342' # J0408-6545
 PolCal = 'J1331+3030'
-PhaseTargetDic = {'J1150-0023':'M87'} # PhaseCal <--> Target pairs
+PhaseTargetDic = {'J1550+0527':''} # PhaseCal <--> Target pairs
 ############################################
 
 ############################################################
 # external commands:
 # tricolour_command = f'singularity run --bind $PWD -B /local/work/fdg ~/storage/tricolour.simg tricolour'
-#shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /local/work/fdg /iranet/groups/lofar/containers/flocs-latest.simg shadems --no-lim-save'
-shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /localwork/fdg /lofar/baq1889/flocs-latest.simg shadems --no-lim-save'
+#shadems_command = f'SINGULARITY_TMPDIR=$PWD singularity run --bind $PWD -B /localwork/fdg /lofar/baq1889/flocs-latest.simg shadems --no-lim-save'
+shadems_command = f'shadems --no-lim-save'
 aoflagger_command = f'aoflagger -v -j 64'
 wsclean_command = f'wsclean -j 64'
 
@@ -188,12 +188,13 @@ def print_flags(vis):
     print(f"Total flags: {total_flagged}/{total_points} ({total_pct:.2f}%)")
     
 ##############################
-# Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap
-t = table.open(invis+'/FEED', nomodify=False)
-feed_angle = t.getcol('RECEPTOR_ANGLE')
+# Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap and set to 0 for the correct interpretation of the polarisation.
+tb = table()
+tb.open(invis+'/FEED', nomodify=False)
+feed_angle = tb.getcol('RECEPTOR_ANGLE')
 new_feed_angle = np.zeros(feed_angle.shape)
-t.putcol('RECEPTOR_ANGLE', new_feed_angle)
-t.close()
+tb.putcol('RECEPTOR_ANGLE', new_feed_angle)
+tb.close()
 
 ###########################
 # Split the calibrators
@@ -350,7 +351,7 @@ casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', 
 casa.applycal(vis=calms,field=PhaseCal, parang=True, flagbackup=False, \
               gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
 os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
-          -update-model-required -weight briggs -0.2 -size 8000 8000 \
+          -update-model-required -weight briggs -0.2 -size 8000 8000 -minuvw-m 50 \
           -scale {pixelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
           -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {calms} > wsclean_{PhaseCal}-selfcal.log')
 
@@ -441,9 +442,9 @@ for i in range(30):
           -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
           -auto-threshold 3 -fits-mask m87-07asec-2500.fits \
           {tgtavgms} > wsclean_{Targets}-selfcal.log')
-    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %i, solint='32s', refant=ref_ant, gaintype='K', parang=False)
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %i, gaintype='K', solint='32s', refant=ref_ant, parang=False)
     # plotms(vis='CASA_Tables/selfcal%02i.K' %i, coloraxis='antenna1', xaxis='time', yaxis='delay')
-    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %i, calmode='p', solint='8s', refant=ref_ant, parang=False,
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %i,  gaintype='G', calmode='p', solint='8s', refant=ref_ant, parang=False,
                  gaintable=['CASA_Tables/selfcal%02i.K' %i])
     # plotms(vis='CASA_Tables/selfcal%02i.Gp' %i, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %i, gaintype='T', calmode='a', solint='80s', refant=ref_ant, solnorm=True, parang=True,
@@ -455,14 +456,14 @@ for i in range(30):
     print_flags(tgtavgms)
 
 # pol cleaning - possible problem with -squared-channel-joining when using -multiscale
-os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -update-model-required -pol IQUV '
-          f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
-          f'-size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2 -minuv-l 80.0 '
-          f'-niter 1000000 -mgain 0.7 '
-          f'-join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 -squared-channel-joining '
-          f'-multiscale -multiscale-scales 1,4,8,16,32,64,128,256 '
-          f'-auto-threshold 3 -fits-mask m87-07asec-2500.fits '
-          f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
+#os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -update-model-required -pol IQUV '
+#          f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
+#          f'-size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2 -minuv-l 80.0 '
+#          f'-niter 1000000 -mgain 0.7 '
+#         f'-join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 -squared-channel-joining '
+#          f'-multiscale -multiscale-scales 1,4,8,16,32,64,128,256 '
+#          f'-auto-threshold 3 -fits-mask m87-07asec-2500.fits '
+#          f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 
 # wsclean with rm
 restoring_beam = 6.0 # arcsec - this is ok for S1 band
@@ -497,9 +498,9 @@ for i in range(10):
     os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{i}  -update-model-required -pol I \
           -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
           -size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2  -minuv-l 80.0 \
-          -niter 1000000 -mgain 0.7 \
+          -niter 1000000 -mgain 0.6 \
           -join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 \
-          -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
+          -multiscale -multiscale-scales 1,3,9,27,90,270 \
           -auto-threshold 3 -fits-mask m87-07asec-2500.fits \
           {' '.join(mss)} > wsclean_{Targets}-selfcal.log')
     for ms in mss:
