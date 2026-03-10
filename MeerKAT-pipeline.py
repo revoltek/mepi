@@ -11,15 +11,23 @@ import numpy as np
 
 ############################################
 # input variables:
-invis   = 'RawData/m87sband-flipped.MS'
-calms   = 'MS_Files/m87sband-cal.MS'
-tgtms   = 'MS_Files/m87sband-tgt.MS'
-tgtavgms   = 'MS_Files/m87sband-tgt-avg.MS'
+#invis   = 'RawData/m87sband-flipped.MS'
+#calms   = 'MS_Files/m87sband-cal.MS'
+#tgtms   = 'MS_Files/m87sband-tgt.MS'
+#tgtavgms   = 'MS_Files/m87sband-tgt-avg.MS'
+invis   = 'RawData/a2163-flipped.MS/'
+calms   = 'MS_Files/a2163-cal.MS'
+tgtms   = 'MS_Files/a2163-tgt.MS'
+tgtavgms   = 'MS_Files/a2163-tgt-avg.MS'
+
+FluxCal = 'J1939-6342' # one of the BandPassCals
+BandPassCal = 'J1939-6342' # J0408-6545
+PolCal = 'J1331+3030'
+PhaseTargetDic = {'J1550+0527':''} # PhaseCal <--> Target pairs
 ref_ant = 'm003'
-# tricolour_strategy = 'tricolour_oxkat.yaml'
-# Set aoflagger_strategy as a file in the same directory as this script
-script_dir = os.path.dirname(os.path.abspath(__file__))
-#script_dir = '.'
+
+#script_dir = os.path.dirname(os.path.abspath(__file__))
+script_dir = '/home/baq1889/opt/src/mepi/'
 aoflagger_strategy = os.path.join(script_dir, 'parsets/aoflagger_StokesQUV.lua')
 rfimask = os.path.join(script_dir, 'parsets/meerkat.rfimask.npy') # ok for UHF and L
 losoto_parset = os.path.join(script_dir, 'parsets/losoto-plot.parset')
@@ -28,11 +36,6 @@ dp3_cor_parset = os.path.join(script_dir, 'parsets/DP3-cor.parset')
 spw_selection = '' # channel selection - here is what we keep in the split command - '0:210~3841' range is for band=S1
 freqbin = 1 # number of channel to average for the target split
 timebin = '0s' # time binning for the target split
-
-FluxCal = 'J1939-6342' # one of the BandPassCals
-BandPassCal = 'J1939-6342' # J0408-6545
-PolCal = 'J1331+3030'
-PhaseTargetDic = {'J1550+0527':''} # PhaseCal <--> Target pairs
 ############################################
 
 ############################################################
@@ -42,6 +45,8 @@ PhaseTargetDic = {'J1550+0527':''} # PhaseCal <--> Target pairs
 shadems_command = f'shadems --no-lim-save'
 aoflagger_command = f'aoflagger -v -j 64'
 wsclean_command = f'wsclean -j 64'
+mask_ms_command = os.path.join(script_dir, 'mask_ms.py')
+correct_parang_command = os.path.join(script_dir, 'correct_parang.py')
 
 # Name your gain tables
 tab = {'K_tab' : 'delay_bp.cal',
@@ -221,8 +226,11 @@ pixelscale = round(0.7 * (2.4/central_freq), 1) # arcsec
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)#, clipminmax=[0.0, 100.0])
-casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
-if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {calms}")
+#casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:925~945MHz, *:950~960MHz, *:1077~1090MHz') # UHF bad data
+#casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:856~880MHz, *:1658~1800MHz, *:1419.8~1421.3MHz') # suggested by SARAO for Lband
+#casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
+
+if central_freq < 2: os.system(f"{mask_ms_command} --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {calms}")
 print_flags(calms)
 
 # Set flux density scale
@@ -414,7 +422,7 @@ casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
-if central_freq < 2: os.system(f"mask_ms.py --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {tgtms}")
+if central_freq < 2: os.system(f"{mask_ms_command} --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {tgtms}")
 os.system(f"{aoflagger_command} -strategy {aoflagger_strategy} -column CORRECTED_DATA {tgtms}")
 print_flags(tgtms)
 
