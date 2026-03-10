@@ -15,7 +15,9 @@ https://github.com/bennahugo/LunaticPolarimetry/blob/master/correct_parang.py
 
 the script writes the output in the CORRECTED_DATA column and needs to be run *for each field*. The corrected data needs to be split after the correction.
 
-plots are done with shadems https://github.com/ratt-ru/shadeMS
+Plots are done with shadems https://github.com/ratt-ru/shadeMS
+
+Note that at the moment plotms cannot be run in the singularity, best is to run an external CASA in a different shell
 
 # RM
 
