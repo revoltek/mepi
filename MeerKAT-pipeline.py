@@ -28,7 +28,8 @@ ref_ant = 'm003'
 
 #script_dir = os.path.dirname(os.path.abspath(__file__))
 script_dir = '/home/baq1889/opt/src/mepi/'
-aoflagger_strategy = os.path.join(script_dir, 'parsets/aoflagger_StokesQUV.lua')
+aoflagger_strategy1 = os.path.join(script_dir, 'parsets/aoflagger_StokesI.lua')
+aoflagger_strategy2 = os.path.join(script_dir, 'parsets/aoflagger_StokesQUV.lua')
 rfimask = os.path.join(script_dir, 'parsets/meerkat.rfimask.npy') # ok for UHF and L
 losoto_parset = os.path.join(script_dir, 'parsets/losoto-plot.parset')
 dp3_sol_parset = os.path.join(script_dir, 'parsets/DP3-sol.parset')
@@ -36,6 +37,10 @@ dp3_cor_parset = os.path.join(script_dir, 'parsets/DP3-cor.parset')
 spw_selection = '' # channel selection - here is what we keep in the split command - '0:210~3841' range is for band=S1
 freqbin = 1 # number of channel to average for the target split
 timebin = '0s' # time binning for the target split
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
+from lib_mepi import *
+
 ############################################
 
 ############################################################
@@ -59,8 +64,8 @@ tab = {'K_tab' : 'delay_bp.cal',
        'Kpol_tab' : 'delay_pol.cal',
        'Gppol_tab' : 'gain_p_pol.cal',
        # Pol cal tables
-       'Kcross_tab': 'kcross.cal',
        'Xf_tab': 'Xf.cal',
+       'Xf_tab_ambcorr': 'Xf_ambcorr.cal',
        'Df_tab': 'Df.cal'}
 inpath = 'CASA_Tables/'
 
@@ -94,104 +99,6 @@ os.remove(old_log_filename)
 # remove annoying warnings
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
-###########################################
-#### Functions needed for J0408-6545 from https://skaafrica.atlassian.net/wiki/spaces/ESDKB/pages/1481408634/Flux+and+bandpass+calibration
-def casa_flux_model(lnunu0, iref, *args):
-    """
-    Compute model:
-    iref * 10**lnunu0 ** (args[0] + args[1] * lnunu0 + args[1] * lnunu0 ** 2 + args[0] * lnunu0 ** 3)
-    """
-    exponent = np.sum([arg * (lnunu0 ** (power))
-                       for power, arg in enumerate(args)], axis=0)
-    return iref * (10**lnunu0) **(exponent)
-
-def fit_flux_model(nu, s, nu0, sigma, sref, order=5):
-    """
-    Fit a flux model of given order from :
-    S = fluxdensity *(freq/reffreq)**(spix[0]+spix[1]*log(freq/reffreq)+..)
-    Very rarely, the requested fit fails, in which case fall
-    back to a lower order, iterating until zeroth order. If all
-    else fails return the weighted mean of the components.
-    Finally convert the fitted parameters to a
-    katpoint FluxDensityModel:
-    log10(S) = a + b*log10(nu) + c*log10(nu)**2 + ...
-    Parameters
-    ----------
-    nu : np.ndarray
-        Frequencies to fit in Hz
-    s : np.ndarray
-        Flux densities to fit in Jy
-    nu0 : float
-        Reference frequency in Hz
-    sigma : np.ndarray
-        Errors of s
-    sref : float
-        Initial guess for the value of s at nu0
-    order : int (optional)
-        The desired order of the fitted flux model (1: SI, 2: SI + Curvature ...)
-    """
-    from scipy.optimize import curve_fit
-
-    init = [sref, -0.7] + [0] * (order - 1)
-    lnunu0 = np.log10(nu/nu0)
-    for fitorder in range(order, -1, -1):
-        try:
-            popt, _ = curve_fit(casa_flux_model, lnunu0, s, p0=init[:fitorder + 1], sigma=sigma)
-        except RuntimeError:
-            logger.warning("Fitting flux model of order %d to CC failed. Trying lower order fit." %
-                           (fitorder,))
-        else:
-            coeffs = np.pad(popt, ((0, order - fitorder),), "constant")
-            return [nu0] +  coeffs.tolist()
-    # Give up and return the weighted mean
-    coeffs = [np.average(s, weights=1./(sigma**2))] + [0] * order
-    return [nu0]+  coeffs.tolist()
-
-def convert_flux_model(nu=None, a=1, b=0, c=0, d=0, Reffreq=1.0e9):
-    """
-    Convert a flux model from the form:
-    log10(S) = a + b*log10(nu) + c*log10(nu)**2 + ...
-    to an ASA style flux model in the form:
-    S = fluxdensity *(freq/reffreq)**(spix[0]+spix[1]*log(freq/reffreq)+..)
-    Parameters
-    ----------
-    nu : np.ndarray
-        Frequencies to fit in Hz
-    a,b,c,d : float
-        parameters of a log flux model.
-    Reffreq : float
-        Reference frequency in Hz
-    returns :
-    reffreq,fluxdensity,spix[0],spix[1],spix[2]
-    """
-    if nu is None:
-        nu = np.linspace(0.9, 2, 200) * 1e9
-    MHz = 1e6
-    S = 10**(a + b*np.log10(nu/MHz) + c*np.log10(nu/MHz)**2 + d*np.log10(nu/MHz)**3)
-    return fit_flux_model(nu, S, Reffreq, np.ones_like(nu), sref=1, order=3)
-
-def print_flags(vis):
-    ##############
-    # Print flagging summary
-    ##############
-    logger.info('Flagging summary for %s:' % vis)
-    s = casa.flagdata(vis=vis, mode='summary')
-    # Print per-antenna flags on one line
-    ant_flags = ', '.join([f"{ant}: {100.0*info.get('flagged', 0)/info.get('total', 0):.1f}%" 
-                           for ant, info in s['antenna'].items()])
-    print(f"Antenna flags: {ant_flags}")
-    
-    # Print per-scan flags on one line
-    scan_flags = ', '.join([f"{scan}: {100.0*info.get('flagged', 0)/info.get('total', 0):.1f}%" 
-                           for scan, info in sorted(s['scan'].items(), key=lambda x: int(x[0]))])
-    print(f"Scan flags: {scan_flags}")
-    
-    # Print total flags percentage
-    total_flagged = s.get('flagged', 0)
-    total_points = s.get('total', 0)
-    total_pct = 100.0 * total_flagged / total_points if total_points > 0 else 0
-    print(f"Total flags: {total_flagged}/{total_points} ({total_pct:.2f}%)")
-    
 ##############################
 # Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap and set to 0 for the correct interpretation of the polarisation.
 tb = table()
@@ -217,6 +124,9 @@ msmd.open(calms)
 PhaseCal_id = msmd.fieldsforname(PhaseCal)[0]
 PolCal_id = msmd.fieldsforname(PolCal)[0]
 central_freq = msmd.chanfreqs(0).mean()/1e9 # central freq in GHz
+if central_freq < 1: band = "UHF"
+elif central_freq > 2: band = "S"
+else: band = "L"
 msmd.close()
 
 # imaging parameters scaled from S1 band
@@ -226,11 +136,11 @@ pixelscale = round(0.7 * (2.4/central_freq), 1) # arcsec
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)#, clipminmax=[0.0, 100.0])
-#casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:925~945MHz, *:950~960MHz, *:1077~1090MHz') # UHF bad data
-#casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:856~880MHz, *:1658~1800MHz, *:1419.8~1421.3MHz') # suggested by SARAO for Lband
-#casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
+if band == "UHF": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:925~945MHz, *:950~960MHz, *:1077~1090MHz') # UHF bad data
+if band == "L": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:856~880MHz, *:1658~1800MHz, *:1419.8~1421.3MHz') # suggested by SARAO for Lband
+if band == "S": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 
-if central_freq < 2: os.system(f"{mask_ms_command} --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {calms}")
+if band == "UHF" or band == "L": os.system(f"{mask_ms_command} --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {calms}")
 print_flags(calms)
 
 # Set flux density scale
@@ -260,29 +170,20 @@ for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
             rm = 0.12
         casa.setjy(vis=calms, field=cal, usescratch = True, standard = 'manual', \
                    fluxdensity=[I,0,0,0], spix=alpha, reffreq=reffreq, polindex=polfrac, polangle=polangle, rotmeas=rm)
+        # TODO: add iono corruption to the model
     else:
         print("Unknown calibrator ", cal)
         sys.exit()
 
 ################################################################
-# backup flags
-casa.flagmanager(vis=calms, mode='save', versionname='PreCal')
+### Bandpass calibration
+logger.info('Bandpass calibration...')
+casa.flagmanager(vis=calms, mode='save', versionname='PreBP')
 
-# Run TFCrop on the DATA column
-logger.info('Running TFCrop...')
-casa.flagdata(vis=calms, mode='tfcrop', field=CalibFields,
-        datacolumn='data', ntime='scan', timecutoff=5.0, freqcutoff=5.0, timefit='line',
-        freqfit='line', extendflags=False, timedevscale=5., freqdevscale=5.,
-        extendpols=True, growaround=False, action='apply',
-        flagbackup=False, overwrite=True, writeflags=True)
-casa.flagdata(vis=calms, mode='extend', field=CalibFields,
-        datacolumn='data', clipzeros=True, ntime='scan', extendflags=False,
-        extendpols=True, growtime=80., growfreq=80., growaround=False,
-        flagneartime=False, flagnearfreq=False, action='apply',
-        flagbackup=False, overwrite=True, writeflags=True)
+os.system(f"{aoflagger_command} -strategy {aoflagger_strategy1} -column DATA {calms}")
+os.system(f"{aoflagger_command} -strategy {aoflagger_strategy1} -column DATA {calms}") # twice
 print_flags(calms)
 
-### Basic calibration
 for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
     # Delay calibration (fast to track the ionosphere)
@@ -301,105 +202,139 @@ for cc in range(2):
                  gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab']], interp=['linear,linearflag'], refant=ref_ant)
     # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
-    # better flags after first cycle
     if cc == 0:
-
-        # Restore original falgs
-        casa.flagmanager(vis=calms, mode='restore', versionname='PreCal')
-        
-        # DEBUG:
         casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']], flagbackup=False)
-        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp.png' {calms}")
-        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph.png' {calms}")
-        ###
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp.png' {calms}")
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph.png' {calms}")
         
         # Flag with AOFlagger
-        casa.flagmanager(vis = calms, mode = 'save', versionname = f'PreAOFlagger{cc}')
         # os.system(f"{tricolour_command} -fs total_power -dc CORRECTED_DATA -c {tricolour_strategy}")
-        os.system(f"{aoflagger_command} -strategy {aoflagger_strategy} -column CORRECTED_DATA {calms}")
+        #os.system(f"{aoflagger_command} -strategy {aoflagger_strategy2} -column CORRECTED_DATA {calms}")
+        casa.flagdata(vis=calms, mode="rflag", field=BandPassCal, datacolumn="corrected", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+        casa.flagdata(vis=calms, mode='extend', field=BandPassCal, datacolumn='corrected', growtime=80, growfreq=80, flagbackup=False)
         print_flags(calms)
 
-        # DEBUG:
-        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp-flag.png' {calms}")
-        os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph-flag.png' {calms}")
-        ###
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp-flag.png' {calms}")
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph-flag.png' {calms}")
+        os.system(f"{shadems_command} -x CORRECTED_DATA:phase -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}_ampph-flag.png' {calms}")
 
-casa.flagmanager(vis = calms, mode = 'save', versionname = f'PrePol')
+### Leackage calibration
+logger.info('Leackage calibration...')
+casa.flagmanager(vis = calms, mode = 'save', versionname = f'PreLeak')
 
-logger.info('Finding leackage...')
-# DEBUG:
-os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak.png' {calms}")
-###
+# plot and flagging
+os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak.png' {calms}")
+casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']], flagbackup=False)
+casa.flagdata(vis=calms, mode="rflag", datacolumn="corrected", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
+casa.flagdata(vis=calms, mode='extend', datacolumn="corrected", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
+print_flags(calms)
+os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak-flag.png' {calms}")
 
-# Leackage on unpol calib
-casa.polcal(vis=calms,
-   caltable=tab['Df_tab'],field=BandPassCal, poltype='Df', solint='inf', refant=ref_ant, combine='scan', interp=['linear,linearflag'],
-   gaintable=[tab['B_tab'], tab['K_tab'], tab['Gp_tab'], tab['Ga_tab']])
-# plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
+for cc in range(2):
 
-# DEBUG:
-casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['Df_tab']], flagbackup=False)
-os.system(f"{shadems_command} --xaxis FREQ --yaxis CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak.png' {calms}")
-###
+    # Leackage on unpol calib
+    casa.polcal(vis=calms,
+        caltable=tab['Df_tab'],field=BandPassCal, poltype='Dflls', solint='inf', refant=ref_ant, combine='scan', interp=['linear,linearflag'],
+        gaintable=[tab['B_tab'], tab['K_tab'], tab['Gp_tab'], tab['Ga_tab']])
+    # plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
+    casa.flagdata(vis=tab['Df_tab'], mode='tfcrop', datacolumn="CPARAM", quackinterval=0.0, ntime="60s", combinescans=True, timecutoff=4.0, freqcutoff=3.0, usewindowstats="both", flagbackup=False)
+    # plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
+
+    if cc == 0:
+        casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['Df_tab']], flagbackup=False)
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak.png' {calms}") # check if the amp are reduced and no big waves/spikes should be there
+        casa.flagdata(vis=calms, mode="rflag", datacolumn="residual", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
+        casa.flagdata(vis=calms, mode='extend', datacolumn="residual", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
+        print_flags(calms)
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak-flag.png' {calms}") # check if the amp are reduced and no big waves/spikes should be there
+        os.system(f"{shadems_command} -x ANTENNA1 -y CORRECTED_DATA:real --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-ant.png' {calms}") #important check for chosing the reference antenna, make sure that no antenna with extreme leakage is chosen  
 
 ############################################################################
 # Bootrap secondary calibrator
 logger.info('Bootstrapping secondary calibrator...')
-casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab']])
-# plotms(vis=tab['Ksec_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay', xconnector='line')
-casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab']])
-# plotms(vis=tab['Gpsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
-casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab']]) # scalar as it can be polarised
-# plotms(vis=tab['Tsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
-# image the secondary and selfcal to improve the local model
-casa.applycal(vis=calms,field=PhaseCal, parang=True, flagbackup=False, \
-              gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
-os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
-          -update-model-required -weight briggs -0.2 -size 8000 8000 -minuvw-m 50 \
-          -scale {pixelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
-          -multiscale -fit-spectral-pol 3  -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {calms} > wsclean_{PhaseCal}-selfcal.log')
+for cc in range(3):
+    casa.gaincal(vis=calms, caltable=tab['Ksec_tab'], field=PhaseCal, gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
+                gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab']])
+    # plotms(vis=tab['Ksec_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay', xconnector='line')
+    casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
+                gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab']])
+    # plotms(vis=tab['Gpsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
+    casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, interp=['linear,linearflag'], \
+                gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab']]) # scalar as it can be polarised
+    # plotms(vis=tab['Tsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
-casa.gaincal(vis=calms, field=PhaseCal, caltable=tab['Ksec_tab'], gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab']])
-casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab']])
-# parang=True for polarised sources and Xf should also be applied, otherwise it absorbs part of the effect
-casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab']])
+    if cc == 0:
+        # image the secondary and selfcal to improve the local model
+        casa.applycal(vis=calms,field=PhaseCal, parang=True, flagbackup=False, \
+                    gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
+        os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
+                -update-model-required -weight briggs -0.2 -size 8000 8000 \
+                -scale {pixelscale}arcsec -channels-out 12 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+                -fit-spectral-pol 3 -deconvolution-channels 3 -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {calms} > wsclean_{PhaseCal}-selfcal.log')
+
+    if cc == 1:
+        # flagging on residuals
+        casa.applycal(vis=calms,field=PhaseCal, parang=True, flagbackup=False, \
+                    gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XY,YX --png './PLOTS/Phasecal.png' {calms}") # check if the amp are reduced and no big waves/spikes should be there
+        casa.flagdata(vis=calms, mode="rflag", field=PhaseCal, datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+        casa.flagdata(vis=calms, mode='extend', field=PhaseCal, datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
+        print_flags(calms)
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XY,YX --png './PLOTS/Phasecal-flag.png' {calms}") # check if the amp are reduced and no big waves/spikes should be there
+        os.system(f"{shadems_command} -x uv -y CORRECTED_DATA:phase -c ANTENNA1 --corr XX,YY --field {PhaseCal} --png './PLOTS/Phasecal_uvphase_XXYY.png' {calms}") # phase against uv-dsitance plot for the gain calibrator. Check both: scatter of phase per baseline (should be managable ~20deg) and if all long baselines are flagged (if the case need to adjust flagging again) 
 
 ##############################################################################
 # Solve for polarization alignment
 logger.info('Solving for polarization alignment...')
-os.system(f"{shadems_command} --xaxis FREQ  --yaxis CORRECTED_DATA --field {PolCal} --corr XY,YX {calms}")
-casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'],tab['Ga_tab'], tab['Df_tab'], tab['Gpsec_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
-# plotms(vis=tab['Kpol_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
-# here we can use also secT to trace slow variations in the amp
-casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', interp=['linear,linearflag'], 
-             gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
-# plotms(vis=tab['Gppol_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
+
+for cc in range(2):
+    casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', interp=['linear,linearflag'], \
+                gaintable=[tab['B_tab'],tab['Ga_tab'], tab['Df_tab'], tab['Gpsec_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
+    # plotms(vis=tab['Kpol_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
+    # here we can use also secT to trace slow variations in the amp
+    casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', interp=['linear,linearflag'], 
+                gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
+    # plotms(vis=tab['Gppol_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
+
+    casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, \
+              gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
+
+    if cc == 0:
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf.png' {calms}")
+        casa.flagdata(vis=calms, mode="rflag", field=PolCal, datacolumn="corrected", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+        casa.flagdata(vis=calms, mode='extend', field=PolCal, datacolumn='corrected', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf-flag.png' {calms}")
 
 # Xf that is constant within a scan, but it drift slowly with time, try not combining scans
 casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant, interp=['linear,linearflag'],
    combine='', preavg=-1., gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
 # plotms(vis=tab['Xf_tab'], xaxis='freq', yaxis='phase')
+logger.info('crosscal: Correcting for phase ambiguity')
+xyamb(logger, xytab=tab['Xf_tab'] ,xyout=tab['Xf_tab_ambcorr'])
+# plotms(vis=tab['Xf_tab_ambcorr'], xaxis='freq', yaxis='phase')
 
 logger.info('Applying calibration to PolCal and test imaging...')
 # Final applycal to PolCal to check pol quality
 casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, \
-              gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab']])
+              gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab_ambcorr']])
+os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-postXf.png' {calms}")
 
 # test image of the polcal - no update model!
 os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
           -no-update-model-required -weight briggs -0.2 -size 1000 1000 \
-          -scale {pixelscale}arcsec -channels-out 6 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
+          -scale {pixelscale}arcsec -channels-out 12 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
           -multiscale -fit-spectral-pol 3 -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {calms} > wsclean_{PolCal}-selfcal.log')
 
-# TODO: if the secondary is polarised we should re-do its calibration including Xf
+#####################################################################################
+# If the secondary is polarised we should re-do its calibration including Xf
+casa.gaincal(vis=calms, caltable=tab['Ksec_tab'], field=PhaseCal, gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr']])
+casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'], tab['Xf_tab_ambcorr']])
+# parang=True for polarised sources and Xf should also be applied, otherwise it absorbs part of the effect
+casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, interp=['linear,linearflag'], \
+             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab'], tab['Xf_tab_ambcorr']])
 
 ###############################################################################
 # Target
@@ -414,7 +349,7 @@ else:
 print_flags(tgtms)
 
 casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, \
-              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab']])
+              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr']])
 print_flags(tgtms)
 
 # Standard flagging for shadowing, zero-clip, and auto-correlation
@@ -450,6 +385,7 @@ for i in range(30):
           -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
           -auto-threshold 3 -fits-mask m87-07asec-2500.fits \
           {tgtavgms} > wsclean_{Targets}-selfcal.log')
+    # TODO: check the minuv-l if the prediction works!
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %i, gaintype='K', solint='32s', refant=ref_ant, parang=False)
     # plotms(vis='CASA_Tables/selfcal%02i.K' %i, coloraxis='antenna1', xaxis='time', yaxis='delay')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %i,  gaintype='G', calmode='p', solint='8s', refant=ref_ant, parang=False,
