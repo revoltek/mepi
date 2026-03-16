@@ -114,9 +114,9 @@ logger.info('Splitting calibrators...')
 if not os.path.exists(calms):
        casa.split(vis = invis, outputvis = calms, field = f"{BandPassCal},{PolCal},{PhaseCal}", datacolumn = 'data', spw = spw_selection)
        logger.info(f'Calibrators split and saved in {calms}')
+       print_flags(calms)
 else:
        logger.info('Calibrators have already been split previously')
-print_flags(calms)
 
 # field ids for imaging
 msmd = msmetadata()
@@ -132,6 +132,7 @@ msmd.close()
 # imaging parameters scaled from S1 band
 pixelscale = round(0.7 * (2.4/central_freq), 1) # arcsec
 
+#################################
 # Standard flagging for shadowing, zero-clip, and auto-correlation
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
@@ -181,6 +182,7 @@ logger.info('Bandpass calibration...')
 casa.flagmanager(vis=calms, mode='save', versionname='PreBP')
 
 os.system(f"{aoflagger_command} -strategy {aoflagger_strategy1} -column DATA {calms}")
+print_flags(calms)
 os.system(f"{aoflagger_command} -strategy {aoflagger_strategy1} -column DATA {calms}") # twice
 print_flags(calms)
 
@@ -188,35 +190,37 @@ for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
     # Delay calibration (fast to track the ionosphere)
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['K_tab'], gaintype='K', refant=ref_ant, solint='8s')
+    #os.system(f'ragavi-gains --table {tab['K_tab']} --plotname ./PLOTS/BP_Kcal-cc{cc}.png')
     # plotms(vis=tab['K_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay') # all plotms should be run separately in a casa session
     # Gain calibration (fast to track the ionosphere)
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Gp_tab'], gaintype='G', calmode='p', 
                  gaintable=[tab['K_tab']], refant=ref_ant, solint='8s')
+    #os.system(f'ragavi-gains --table {tab['Gp_tab']} --plotname ./PLOTS/BP_Gpcal-cc{cc}.png')
     # plotms(vis=tab['Gp_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase')
     # one can now combine the scans and use different B as diagnostics
     casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', 
                   gaintable=[tab['K_tab'],tab['Gp_tab']], combine='scan', solint='inf', refant=ref_ant)
+    #os.system(f'ragavi-gains --table {tab['B_tab']} --plotname ./PLOTS/BP_Bcal-cc{cc}.png')
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Ga_tab'], gaintype='G', calmode='a', 
                  gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab']], interp=['linear,linearflag'], refant=ref_ant)
+    #os.system(f'ragavi-gains --table {tab['Ga_tab']} --plotname ./PLOTS/BP_Gacal-cc{cc}.png')
     # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
     if cc == 0:
         casa.applycal(vis=calms,field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']], flagbackup=False)
-        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp.png' {calms}")
-        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph.png' {calms}")
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp.png' {calms}")
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph.png' {calms}")
         
-        # Flag with AOFlagger
-        # os.system(f"{tricolour_command} -fs total_power -dc CORRECTED_DATA -c {tricolour_strategy}")
         #os.system(f"{aoflagger_command} -strategy {aoflagger_strategy2} -column CORRECTED_DATA {calms}")
         casa.flagdata(vis=calms, mode="rflag", field=BandPassCal, datacolumn="corrected", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
         casa.flagdata(vis=calms, mode='extend', field=BandPassCal, datacolumn='corrected', growtime=80, growfreq=80, flagbackup=False)
         print_flags(calms)
 
-        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-amp-flag.png' {calms}")
-        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}-ph-flag.png' {calms}")
-        os.system(f"{shadems_command} -x CORRECTED_DATA:phase -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass{cc}_ampph-flag.png' {calms}")
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp-flag.png' {calms}")
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph-flag.png' {calms}")
+        os.system(f"{shadems_command} -x CORRECTED_DATA:phase -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass_ampph-flag.png' {calms}")
 
 ### Leackage calibration
 logger.info('Leackage calibration...')
@@ -236,6 +240,7 @@ for cc in range(2):
     casa.polcal(vis=calms,
         caltable=tab['Df_tab'],field=BandPassCal, poltype='Dflls', solint='inf', refant=ref_ant, combine='scan', interp=['linear,linearflag'],
         gaintable=[tab['B_tab'], tab['K_tab'], tab['Gp_tab'], tab['Ga_tab']])
+    #os.system(f'ragavi-gains --table {tab['Df_tab']} --plotname ./PLOTS/BP_Dfcal-cc{cc}.png')
     # plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
     casa.flagdata(vis=tab['Df_tab'], mode='tfcrop', datacolumn="CPARAM", quackinterval=0.0, ntime="60s", combinescans=True, timecutoff=4.0, freqcutoff=3.0, usewindowstats="both", flagbackup=False)
     # plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
