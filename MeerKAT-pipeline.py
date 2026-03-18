@@ -19,7 +19,7 @@ FluxCal = 'J1939-6342' # one of the BandPassCals
 BandPassCal = 'J1939-6342,J0408-6545'
 PolCal = 'J1331+3030'
 PhaseTargetDic = {'J1150-0023':'M87'} # PhaseCal <--> Target pairs
-ref_ant = 'm003'
+ref_ant = 'm063' # longest BL
 
 invis   = 'RawData/a2163-flipped.MS/'
 calms   = 'MS_Files/a2163-cal.MS'
@@ -29,7 +29,7 @@ FluxCal = 'J1939-6342' # one of the BandPassCals
 BandPassCal = 'J1939-6342' # J0408-6545
 PolCal = 'J1331+3030'
 PhaseTargetDic = {'J1550+0527':'A2163'} # PhaseCal <--> Target pairs
-ref_ant = 'm003'
+ref_ant = 'm063'
 
 #script_dir = os.path.dirname(os.path.abspath(__file__))
 script_dir = '/home/baq1889/opt/src/mepi/'
@@ -392,7 +392,7 @@ else:
        logger.info('Target has already been split previously')
 print_flags(tgtms)
 
-casa.applycal(vis=tgtms, parang=False, flagbackup=False, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
+casa.applycal(vis=tgtms, parang=False, flagbackup=False, interp=['linear,linearflag', 'linear,linearflag', 'linear,linearflag'], \
               gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab'], tab['Tsec_tab']])
 print_flags(tgtms)
 
