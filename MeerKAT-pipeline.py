@@ -250,8 +250,8 @@ for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
     # Leackage on unpol calib
     casa.polcal(vis=calms,
-        caltable=tab['Df_tab'],field=BandPassCal, poltype='Dflls', solint='inf', refant=ref_ant, combine='scan', interp=['linear,linearflag'],
-        gaintable=[tab['B_tab'], tab['K_tab'], tab['Gp_tab'], tab['Ga_tab']])
+        caltable=tab['Df_tab'],field=BandPassCal, poltype='Dflls', solint='inf', combine='scan',
+        gaintable=[tab['B_tab'], tab['K_tab'], tab['Gp_tab'], tab['Ga_tab']], interp=['linear,linearflag'], refant=ref_ant)
     os.system(f'{ragavi_command} --table {tab['Df_tab']} --xaxis channel --yaxis amplitude --plotname ./PLOTS/cal_BP-Df-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
     casa.flagdata(vis=tab['Df_tab'], mode='tfcrop', datacolumn="CPARAM", quackinterval=0.0, ntime="60s", combinescans=True, timecutoff=4.0, freqcutoff=3.0, usewindowstats="both", flagbackup=False)
@@ -270,8 +270,8 @@ for cc in range(2):
 
 # re-do BP to use better flags
 logger.info(f'Re-doing bandpass calibration with better flags...')
-casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', interp=['linear,linearflag'],
-              gaintable=[tab['K_tab'],tab['Gp_tab'],tab['Df_tab']], combine='scan', solint='inf', refant=ref_ant)
+casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', combine='scan', solint='inf',
+              gaintable=[tab['Df_tab'],tab['K_tab'],tab['Gp_tab']], interp=['linear,linearflag'], refant=ref_ant)
 os.system(f'{ragavi_command} --table {tab['B_tab']} --plotname ./PLOTS/cal_BP-B-ccFINAL.png >> ragavi.log')
 # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
 # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
@@ -284,23 +284,23 @@ logger.info('Bootstrapping secondary calibrator...')
 
 for cc in range(3):
     logger.info(f'Calibration cycle {cc+1}')
-    casa.gaincal(vis=calms, caltable=tab['Ksec_tab'], field=PhaseCal, gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
-                gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab']])
+    casa.gaincal(vis=calms, caltable=tab['Ksec_tab'], field=PhaseCal, gaintype='K', \
+                gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ga_tab'], tab['Gp_tab']], interp=['linear,linearflag', 'linear,linearflag'], refant=ref_ant)
     os.system(f'{ragavi_command} --table {tab['Ksec_tab']} --plotname ./PLOTS/cal_Sec-K-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Ksec_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay', xconnector='line')
-    casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
-                gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab']])
+    casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', \
+                gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ksec_tab'], tab['Ga_tab']], interp=['linear,linearflag', 'linear,linearflag'], refant=ref_ant)
     os.system(f'{ragavi_command} --table {tab['Gpsec_tab']} --yaxis phase --plotname ./PLOTS/cal_Sec-Gp-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Gpsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
-    casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, interp=['linear,linearflag'], \
-                gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab']]) # scalar as it can be polarised
+    casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, \
+                gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab']], interp=['linear,linearflag', 'linear,linearflag'], refant=ref_ant) # scalar as it can be polarised
     os.system(f'{ragavi_command} --table {tab['Tsec_tab']} --yaxis amplitude --plotname ./PLOTS/cal_Sec-Ta-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Tsec_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
     if cc == 0:
         # image the secondary and selfcal to improve the local model
-        casa.applycal(vis=calms, field=PhaseCal, parang=True, flagbackup=False, interp=['linear,linearflag'], \
-                    gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
+        casa.applycal(vis=calms, field=PhaseCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
+                    gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab'], tab['Tsec_tab']])
         os.system(f'{wsclean_command} -name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
                 -update-model-required -weight briggs -0.2 -size 8000 8000 \
                 -scale {pixelscale}arcsec -channels-out 12 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
@@ -308,13 +308,13 @@ for cc in range(3):
 
     if cc == 1:
         # flagging on residuals
-        casa.applycal(vis=calms, field=PhaseCal, parang=True, flagbackup=False, interp=['linear,linearflag'], \
-                    gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab']])
-        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XY,YX --png './PLOTS/Phasecal.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
+        casa.applycal(vis=calms, field=PhaseCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
+                    gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab'], tab['Tsec_tab']])
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XX,YY --png './PLOTS/Phasecal.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
         casa.flagdata(vis=calms, mode="rflag", field=PhaseCal, datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
         casa.flagdata(vis=calms, mode='extend', field=PhaseCal, datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
         print_flags(calms)
-        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XY,YX --png './PLOTS/Phasecal-flag.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XX,YY --png './PLOTS/Phasecal-flag.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
         os.system(f"{shadems_command} -x uv -y CORRECTED_DATA:phase -c ANTENNA1 --corr XX,YY --field {PhaseCal} --png './PLOTS/Phasecal_uvphase_XXYY.png' {calms} >> shadems.log") # phase against uv-dsitance plot for the gain calibrator. Check both: scatter of phase per baseline (should be managable ~20deg) and if all long baselines are flagged (if the case need to adjust flagging again) 
 
 ##############################################################################
@@ -324,18 +324,18 @@ casa.flagmanager(vis=calms, mode='save', versionname='PrePol')
 
 for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
-    casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', interp=['linear,linearflag'], \
-                gaintable=[tab['B_tab'],tab['Ga_tab'], tab['Df_tab'], tab['Gpsec_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
+    casa.gaincal(vis=calms, caltable=tab['Kpol_tab'], field=PolCal, gaintype='K', interp=['linear,linearflag','linear,linearflag'], \
+                gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ga_tab'], tab['Gpsec_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
     os.system(f'{ragavi_command} --table {tab["Kpol_tab"]} --plotname ./PLOTS/cal_Pol-K-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Kpol_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
     # here we can use also secT to trace slow variations in the amp
-    casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', interp=['linear,linearflag'], 
-                gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
+    casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', interp=['linear,linearflag','linear,linearflag'], 
+                gaintable=[tab['B_tab'], tab['Df_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab']], refant=ref_ant, solint='8s')
     os.system(f'{ragavi_command} --table {tab["Gppol_tab"]} --yaxis phase --plotname ./PLOTS/cal_Pol-Gp-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Gppol_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 
-    casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag'], \
-              gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
+    casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
+              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
 
     if cc == 0:
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf.png' {calms} >> shadems.log")
@@ -344,8 +344,8 @@ for cc in range(2):
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf-flag.png' {calms} >> shadems.log")
 
 # Xf that is constant within a scan, but it drift slowly with time, try not combining scans
-casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant, interp=['linear,linearflag'],
-   combine='', preavg=-1., gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
+casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant, interp=['linear,linearflag','linear,linearflag'],
+   combine='', preavg=-1., gaintable=[tab['B_tab'], tab['Df_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
 os.system(f'{ragavi_command} --table {tab["Xf_tab"]} --yaxis phase --plotname ./PLOTS/cal_Pol-Xf.png >> ragavi.log')
 # plotms(vis=tab['Xf_tab'], xaxis='freq', yaxis='phase')
 logger.info('Crosscal: Correcting for phase ambiguity')
@@ -355,8 +355,8 @@ os.system(f'{ragavi_command} --table {tab["Xf_tab_ambcorr"]} --yaxis phase --plo
 
 logger.info('Applying calibration to PolCal and test imaging...')
 # Final applycal to PolCal to check pol quality
-casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag'], \
-              gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab_ambcorr']])
+casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
+              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
 os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-postXf.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
 
 # test image of the polcal - no update model!
@@ -367,15 +367,15 @@ os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deco
 
 #####################################################################################
 # If the secondary is polarised we should re-do its calibration including Xf
-casa.gaincal(vis=calms, caltable=tab['Ksec_tab'], field=PhaseCal, gaintype='K', refant=ref_ant, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'], tab['Ga_tab'], tab['Gp_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr']])
+casa.gaincal(vis=calms, caltable=tab['Ksec_tab'], field=PhaseCal, gaintype='K', refant=ref_ant, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
+             gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ga_tab'], tab['Gp_tab']])
 os.system(f'{ragavi_command} --table {tab['Ksec_tab']} --plotname ./PLOTS/cal_Sec-K-FINAL.png >> ragavi.log')
-casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'], tab['Xf_tab_ambcorr']])
+casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
+             gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ksec_tab'], tab['Ga_tab']])
 os.system(f'{ragavi_command} --table {tab['Gpsec_tab']} --yaxis phase --plotname ./PLOTS/cal_Sec-Gp-FINAL.png >> ragavi.log')
 # parang=True for polarised sources and Xf should also be applied, otherwise it absorbs part of the effect
-casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, interp=['linear,linearflag'], \
-             gaintable=[tab['B_tab'],tab['Ksec_tab'],tab['Ga_tab'],tab['Df_tab'],tab['Gpsec_tab'], tab['Xf_tab_ambcorr']])
+casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
+             gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab']])
 os.system(f'{ragavi_command} --table {tab['Tsec_tab']} --yaxis amplitude --plotname ./PLOTS/cal_Sec-Ta-FINAL.png >> ragavi.log')
 
 #######################################################################################################################################
@@ -392,8 +392,8 @@ else:
        logger.info('Target has already been split previously')
 print_flags(tgtms)
 
-casa.applycal(vis=tgtms, field=Targets, parang=False, flagbackup=False, interp=['linear,linearflag'], \
-              gaintable=[tab['Ksec_tab'],tab['Ga_tab'],tab['B_tab'],tab['Gpsec_tab'], tab['Tsec_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr']])
+casa.applycal(vis=tgtms, parang=False, flagbackup=False, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
+              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab'], tab['Tsec_tab']])
 print_flags(tgtms)
 
 # Standard flagging for shadowing, zero-clip, and auto-correlation
