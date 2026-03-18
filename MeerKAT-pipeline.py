@@ -18,7 +18,7 @@ tgtavgms   = 'MS_Files/m87sband-tgt-avg.MS'
 FluxCal = 'J1939-6342' # one of the BandPassCals
 BandPassCal = 'J1939-6342,J0408-6545'
 PolCal = 'J1331+3030'
-PhaseTargetDic = {'J1150-0023':''} # PhaseCal <--> Target pairs
+PhaseTargetDic = {'J1150-0023':'M87'} # PhaseCal <--> Target pairs
 ref_ant = 'm003'
 
 invis   = 'RawData/a2163-flipped.MS/'
@@ -28,7 +28,7 @@ tgtavgms   = 'MS_Files/a2163-tgt-avg.MS'
 FluxCal = 'J1939-6342' # one of the BandPassCals
 BandPassCal = 'J1939-6342' # J0408-6545
 PolCal = 'J1331+3030'
-PhaseTargetDic = {'J1550+0527':''} # PhaseCal <--> Target pairs
+PhaseTargetDic = {'J1550+0527':'A2163'} # PhaseCal <--> Target pairs
 ref_ant = 'm003'
 
 #script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -320,6 +320,7 @@ for cc in range(3):
 ##############################################################################
 # Solve for polarization alignment
 logger.info('Solving for polarization alignment...')
+casa.flagmanager(vis=calms, mode='save', versionname='PrePol')
 
 for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
@@ -356,7 +357,7 @@ logger.info('Applying calibration to PolCal and test imaging...')
 # Final applycal to PolCal to check pol quality
 casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag'], \
               gaintable=[tab['B_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Df_tab'], tab['Tsec_tab'], tab['Gppol_tab'], tab['Xf_tab_ambcorr']])
-os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-postXf.png' {calms}")
+os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-postXf.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
 
 # test image of the polcal - no update model!
 os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
@@ -400,8 +401,9 @@ casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
 if central_freq < 2: os.system(f"{mask_ms_command} --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {tgtms}")
+print_flags(tgtms)
+casa.flagmanager(vis=tgtavgms, mode='save', versionname='PreAoflagger')
 os.system(f"{aoflagger_command} -strategy {aoflagger_strategy1} -column CORRECTED_DATA {tgtms} >> aoflagger.log")
-print_flags(calms)
 os.system(f"{aoflagger_command} -strategy {aoflagger_strategy1} -column CORRECTED_DATA {tgtms} >> aoflagger.log") # twice
 print_flags(tgtms)
 
@@ -418,6 +420,7 @@ print_flags(tgtavgms)
 ##########################################################################################
 # selfcal only on scalar amp and possibly diag phase.
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
+casa.flagmanager(vis=tgtavgms, mode='save', versionname='PreSelfcal')
 casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
 for cc in range(30):
     # ok for m87 sband
@@ -427,8 +430,12 @@ for cc in range(30):
           -niter 1000000 -mgain 0.7 \
           -join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 \
           -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
-          -auto-threshold 3 -fits-mask m87-07asec-2500.fits \
+          -auto-threshold 3 \
           {tgtavgms} > wsclean_{Targets}-selfcal.log')
+    
+    casa.flagdata(vis=tgtavgms, mode="rflag", field=PhaseCal, datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+    casa.flagdata(vis=tgtavgms, mode='extend', field=PhaseCal, datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
+ 
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %cc, gaintype='K', solint='32s', refant=ref_ant, parang=False)
     os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.K --plotname ./PLOTS/target-K-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.K' %cc, coloraxis='antenna1', xaxis='time', yaxis='delay')
