@@ -369,6 +369,7 @@ os.system(f'{wsclean_command} -name IMG/{PolCal}-selfcal -reorder -parallel-deco
 
 #####################################################################################
 # If the secondary is polarised we should re-do its calibration including Xf
+logger.info('Re-doing secondary calibrator calibration including Xf...')
 casa.gaincal(vis=calms, caltable=tab['Ksec_tab'], field=PhaseCal, gaintype='K', refant=ref_ant, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ga_tab']])
 os.system(f'{ragavi_command} --table {tab['Ksec_tab']} --plotname ./PLOTS/cal_Sec-K-FINAL.png >> ragavi.log')
