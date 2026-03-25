@@ -225,8 +225,8 @@ for cc in range(2):
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph.png' {calms} >> shadems.log")
         
         os.system(f"{aoflagger_command} -strategy {aoflagger_strategy2} -column CORRECTED_DATA {calms} >> aoflagger.log")
-        casa.flagdata(vis=calms, mode="rflag", datacolumn="corrected", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
-        casa.flagdata(vis=calms, mode='extend', datacolumn='corrected', growtime=80, growfreq=80, flagbackup=False)
+        casa.flagdata(vis=calms, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+        casa.flagdata(vis=calms, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False)
         print_flags(calms)
 
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp-flag.png' {calms} >> shadems.log")
@@ -260,8 +260,8 @@ for cc in range(2):
     # plotms(vis=tab['Df_tab'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
 
     if cc == 0:
-        casa.applycal(vis=calms,field=BandPassCal, interp=['linear,linearflag'], flagbackup=False, 
-                      gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab'],tab['Df_tab']])
+        casa.applycal(vis=calms,field=BandPassCal, interp=['linear,linearflag','linear,linearflag'], flagbackup=False, 
+                      gaintable=[tab['B_tab'],tab['Df_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']])
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
         casa.flagdata(vis=calms, mode="rflag", datacolumn="residual", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
         casa.flagdata(vis=calms, mode='extend', datacolumn="residual", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
@@ -341,8 +341,8 @@ for cc in range(2):
 
     if cc == 0:
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf.png' {calms} >> shadems.log")
-        casa.flagdata(vis=calms, mode="rflag", field=PolCal, datacolumn="corrected", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
-        casa.flagdata(vis=calms, mode='extend', field=PolCal, datacolumn='corrected', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
+        casa.flagdata(vis=calms, mode="rflag", field=PolCal, datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+        casa.flagdata(vis=calms, mode='extend', field=PolCal, datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf-flag.png' {calms} >> shadems.log")
 
 # Xf that is constant within a scan, but it drift slowly with time, try not combining scans
@@ -395,11 +395,13 @@ else:
        logger.info('Target has already been split previously')
 print_flags(tgtms)
 
+logger.info('Applying calibration to target...')
 casa.applycal(vis=tgtms, parang=False, flagbackup=False, interp=['linear,linearflag', 'linear,linearflag', 'linear,linearflag'], \
               gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab'], tab['Tsec_tab']])
 print_flags(tgtms)
 
 # Standard flagging for shadowing, zero-clip, and auto-correlation
+logger.info('Flagging target...')
 casa.flagdata(vis=tgtms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=tgtms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=tgtms, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
@@ -429,11 +431,11 @@ for cc in range(30):
     # ok for m87 sband
     os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{cc}  -update-model-required -pol I \
           -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
-          -size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2  \
-          -niter 1000000 -mgain 0.7 \
-          -join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 \
+          -size 5000 5000 -scale {pixelscale}arcsec -weight briggs -0.2  \
+          -niter 1000000 -mgain 0.8 \
+          -join-channels -channels-out 12 -deconvolution-channels 3 -fit-spectral-pol 3 \
           -multiscale -multiscale-scales 1,4,8,16,32,64,128,256 \
-          -auto-threshold 3 \
+          -auto-mask 5 -auto-threshold 3 \
           {tgtavgms} > wsclean_{Targets}-selfcal.log')
     
     os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/Tgt-c{cc}.png' {tgtavgms} >> shadems.log")
@@ -444,11 +446,11 @@ for cc in range(30):
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %cc, gaintype='K', solint='32s', refant=ref_ant, parang=False)
     os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.K --plotname ./PLOTS/target-K-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.K' %cc, coloraxis='antenna1', xaxis='time', yaxis='delay')
-    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %cc,  gaintype='G', calmode='p', solint='8s', refant=ref_ant, parang=False,
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %cc,  gaintype='G', calmode='p', solint='32s', refant=ref_ant, parang=False,
                  gaintable=['CASA_Tables/selfcal%02i.K' %cc])
     os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Gp --plotname ./PLOTS/target-Gp-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.Gp' %cc, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
-    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %cc, gaintype='T', calmode='a', solint='80s', refant=ref_ant, solnorm=True, parang=True,
+    casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %cc, gaintype='T', calmode='a', solint='128s', refant=ref_ant, solnorm=True, parang=True,
                  gaintable=['CASA_Tables/selfcal%02i.K' %cc, 'CASA_Tables/selfcal%02i.Gp' %cc])
     os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Ga --plotname ./PLOTS/target-Ga-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.Ga' %cc, coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
@@ -471,14 +473,14 @@ for cc in range(30):
 restoring_beam = 6.0 # arcsec - this is ok for S1 band
 os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol QU '
           f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
-          f'-size 1500 1500 -scale 2arcsec -weight briggs -0.5 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
+          f'-size 5000 5000 -scale 2arcsec -weight briggs -0.2 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
           f'-niter 25000 -mgain 0.75 -nmiter 12 '
           f'-join-channels -channels-out 125 -join-polarizations -squared-channel-joining -fit-rm '
           f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 # relative I stokes for fractional Pol
 os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol I '
           f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
-          f'-size 1500 1500 -scale 2arcsec -weight briggs -0.5 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
+          f'-size 5000 5000 -scale 2arcsec -weight briggs -0.2 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
           f'-niter 25000 -mgain 0.75 -nmiter 12 '
           f'-join-channels -channels-out 125 '
           f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
