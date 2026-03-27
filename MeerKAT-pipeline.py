@@ -147,7 +147,7 @@ pixelscale = round(0.7 * (2.4/central_freq), 1) # arcsec
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)#, clipminmax=[0.0, 100.0])
-if band == "UHF": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:925~945MHz, *:950~960MHz, *:1077~1090MHz') # UHF bad data
+if band == "UHF": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:0~570MHz, *:925~945MHz, *:950~960MHz, *:1061~1090MHz') # UHF bad data
 if band == "L": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:856~880MHz, *:1658~1800MHz, *:1419.8~1421.3MHz') # suggested by SARAO for Lband
 if band == "S": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
 
@@ -158,27 +158,35 @@ print_flags(calms)
 for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
     logger.info('Setting model for calibrator %s' % cal)
     if cal == 'J1939-6342':
-        casa.setjy(vis = calms, field = cal, standard = 'Stevens-Reynolds 2016', usescratch = True)
-    elif cal == 'J0408-6545':
-        a=-0.9790; b=3.3662; c=-1.1216; d=0.0861
-        reffreq,fluxdensity,spix0,spix1,spix2 =  convert_flux_model(np.linspace(0.9,2,200)*1e9,a,b,c,d)
-        casa.setjy(vis = calms, field = cal, usescratch = True, standard = 'manual', \
-            spix = [spix0, spix1, spix2, 0], fluxdensity = fluxdensity, reffreq = '%f Hz'%(reffreq))
-    elif cal == 'J1331+3030':
-        if central_freq > 1.:
-            I= 14.7172
-            alpha= [-0.4507, -0.1798, 0.0357]
-            reffreq= '1.47GHz'
-            polfrac= 0.098
-            polangle = 0.575959
-            rm=0.
+        if band == "UHF":
+            logger.info('crosscal: setting UHF-band model for flux calibrator J1939-6342')
+            os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parset/J1939-6342_UHF.txt')} -f {cal} -j 2" )
         else:
+            casa.setjy(vis = calms, field = cal, standard = 'Stevens-Reynolds 2016', usescratch = True)
+    elif cal == 'J0408-6545':
+        if band == "UHF":
+            logger.info('crosscal: setting UHF-band model for flux calibrator J0408-6545')
+            os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parset/J0408-6545_UHF.txt')} -f {cal} -j 2" )
+        else:
+            a=-0.9790; b=3.3662; c=-1.1216; d=0.0861
+            reffreq,fluxdensity,spix0,spix1,spix2 =  convert_flux_model(np.linspace(0.9,2,200)*1e9,a,b,c,d)
+            casa.setjy(vis = calms, field = cal, usescratch = True, standard = 'manual', \
+                spix = [spix0, spix1, spix2, 0], fluxdensity = fluxdensity, reffreq = '%f Hz'%(reffreq))
+    elif cal == 'J1331+3030':
+        if band == "UHF":
             I = 19.27475
             alpha = [-0.42727, -0.14583]
             reffreq = '0.816GHz'
             polfrac = 0.06398396324
             polangle = 0.41598756411
             rm = 0.12
+        else:
+            I= 14.7172
+            alpha= [-0.4507, -0.1798, 0.0357]
+            reffreq= '1.47GHz'
+            polfrac= 0.098
+            polangle = 0.575959
+            rm=0.
         casa.setjy(vis=calms, field=cal, usescratch = True, standard = 'manual', \
                    fluxdensity=[I,0,0,0], spix=alpha, reffreq=reffreq, polindex=polfrac, polangle=polangle, rotmeas=rm)
         # TODO: add iono corruption to the model
@@ -239,13 +247,13 @@ logger.info('Leackage calibration...')
 casa.flagmanager(vis = calms, mode = 'save', versionname = f'PreLeak')
 
 # plot and flagging
-os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak.png' {calms} >> shadems.log")
 casa.applycal(vis=calms, interp=['linear,linearflag'], flagbackup=False, 
               field=BandPassCal, gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab'],tab['Ga_tab']])
-casa.flagdata(vis=calms, mode="rflag", datacolumn="corrected", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
-casa.flagdata(vis=calms, mode='extend', datacolumn="corrected", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
-print_flags(calms)
-os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak-flag.png' {calms} >> shadems.log")
+os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak.png' {calms} >> shadems.log")
+#casa.flagdata(vis=calms, mode="rflag", datacolumn="corrected", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
+#casa.flagdata(vis=calms, mode='extend', datacolumn="corrected", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
+#print_flags(calms)
+#os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak-flag.png' {calms} >> shadems.log")
 
 for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
@@ -269,7 +277,7 @@ for cc in range(2):
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak-flag.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
         os.system(f"{shadems_command} -x ANTENNA1 -y CORRECTED_DATA:real --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-ant.png' {calms} >> shadems.log") #important check for chosing the reference antenna, make sure that no antenna with extreme leakage is chosen  
 
-# re-do BP to use better flags
+# re-do BP to use better flags - REMOVE?
 logger.info(f'Re-doing bandpass calibration with better flags...')
 casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', combine='scan', solint='inf',
               gaintable=[tab['Df_tab'],tab['K_tab'],tab['Gp_tab']], interp=['linear,linearflag'], refant=ref_ant)
@@ -448,11 +456,11 @@ for cc in range(30):
     # plotms(vis='CASA_Tables/selfcal%02i.K' %cc, coloraxis='antenna1', xaxis='time', yaxis='delay')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Gp' %cc,  gaintype='G', calmode='p', solint='32s', refant=ref_ant, parang=False,
                  gaintable=['CASA_Tables/selfcal%02i.K' %cc])
-    os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Gp --plotname ./PLOTS/target-Gp-i{cc:02d}.png >> ragavi.log')
+    os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Gp --yaxis phase --plotname ./PLOTS/target-Gp-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.Gp' %cc, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %cc, gaintype='T', calmode='a', solint='128s', refant=ref_ant, solnorm=True, parang=True,
                  gaintable=['CASA_Tables/selfcal%02i.K' %cc, 'CASA_Tables/selfcal%02i.Gp' %cc])
-    os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Ga --plotname ./PLOTS/target-Ga-i{cc:02d}.png >> ragavi.log')
+    os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Ga --yaxis amp --plotname ./PLOTS/target-Ga-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.Ga' %cc, coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
     #casa.bandpass(vis=tgtavgms, caltable='selfcal%02i.B' %cc, combine='', solint='300s', gaintable=['selfcal%02i.G' %cc, 'selfcal%02i.K' %cc], refant='m002', parang=False)
     casa.applycal(vis=tgtavgms, flagbackup=False, parang=True,
@@ -471,14 +479,14 @@ for cc in range(30):
 
 # wsclean with rm
 restoring_beam = 6.0 # arcsec - this is ok for S1 band
-os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol QU '
+os.system(f'{wsclean_command} -name IMG/{Targets}-rm -no-update-model-required -pol QU '
           f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
           f'-size 5000 5000 -scale 2arcsec -weight briggs -0.2 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
           f'-niter 25000 -mgain 0.75 -nmiter 12 '
           f'-join-channels -channels-out 125 -join-polarizations -squared-channel-joining -fit-rm '
           f'{tgtavgms} > wsclean_{Targets}-selfcal.log')
 # relative I stokes for fractional Pol
-os.system(f'{wsclean_command} -name img/m87-rm -no-update-model-required -pol I '
+os.system(f'{wsclean_command} -name IMG/{Targets}-rm -no-update-model-required -pol I '
           f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
           f'-size 5000 5000 -scale 2arcsec -weight briggs -0.2 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
           f'-niter 25000 -mgain 0.75 -nmiter 12 '
