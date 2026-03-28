@@ -60,7 +60,8 @@ ragavi_command = 'ragavi-gains'
 correct_parang_command = os.path.join(script_dir, 'correct_parang.py')
 
 # Name your gain tables
-tab = {'K_tab' : 'delay_bp.cal',
+tab = {'Ginit_tab' : 'gain_init_bp.cal',
+       'K_tab' : 'delay_bp.cal',
        'B_tab' : 'bandpass.cal',
        'Gp_tab': 'gain_p_bp.cal',
        'Ga_tab': 'gain_a_bp.cal',
@@ -130,9 +131,15 @@ msmd.open(calms)
 PhaseCal_id = msmd.fieldsforname(PhaseCal)[0]
 PolCal_id = msmd.fieldsforname(PolCal)[0]
 central_freq = msmd.chanfreqs(0).mean()/1e9 # central freq in GHz
-if central_freq < 1: band = "UHF"
-elif central_freq > 2: band = "S"
-else: band = "L"
+if central_freq < 1: 
+     band = "UHF"
+     spw_good = '0:842~869MHz'
+elif central_freq > 2: 
+     band = "S"
+     spw_good = '0:2010~1096MHz'
+else: 
+     band = "L"
+     spw_good = '0:1326~1367MHz'
 msmd.close()
 
 # imaging parameters scaled from S1 band
@@ -159,14 +166,14 @@ for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
     logger.info('Setting model for calibrator %s' % cal)
     if cal == 'J1939-6342':
         if band == "UHF":
-            logger.info('crosscal: setting UHF-band model for flux calibrator J1939-6342')
-            os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parset/J1939-6342_UHF.txt')} -f {cal} -j 2" )
+            logger.info('-- setting UHF-band model for flux calibrator J1939-6342')
+            os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parsets/J1939-6342_UHF.txt')} -f {cal} -j 2" )
         else:
             casa.setjy(vis = calms, field = cal, standard = 'Stevens-Reynolds 2016', usescratch = True)
     elif cal == 'J0408-6545':
         if band == "UHF":
-            logger.info('crosscal: setting UHF-band model for flux calibrator J0408-6545')
-            os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parset/J0408-6545_UHF.txt')} -f {cal} -j 2" )
+            logger.info('-- setting UHF-band model for flux calibrator J0408-6545')
+            os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parsets/J0408-6545_UHF.txt')} -f {cal} -j 2" )
         else:
             a=-0.9790; b=3.3662; c=-1.1216; d=0.0861
             reffreq,fluxdensity,spix0,spix1,spix2 =  convert_flux_model(np.linspace(0.9,2,200)*1e9,a,b,c,d)
@@ -206,25 +213,30 @@ print_flags(calms)
 
 for cc in range(2):
     logger.info(f'Calibration cycle {cc+1}')
+    # Pre gaincal
+    casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Ginit_tab'], gaintype='G', calmode='ap', 
+                 refant=ref_ant, solint='int', spw=spw_good, solnorm=True)
+    os.system(f'{ragavi_command} --table {tab['Ginit_tab']} --plotname ./PLOTS/cal_BP-Ginit-cc{cc}.png >> ragavi.log') 
+    # plotms(vis=tab['Ginit_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase')
     # Delay calibration (fast to track the ionosphere)
-    casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['K_tab'], gaintype='K', refant=ref_ant, solint='32s')
+    casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['K_tab'], gaintype='K', 
+                 gaintable=[tab['Ginit_tab']], refant=ref_ant, solint='32s')
     os.system(f'{ragavi_command} --table {tab['K_tab']} --plotname ./PLOTS/cal_BP-K-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['K_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay') # all plotms should be run separately in a casa session
-    # Gain calibration (fast to track the ionosphere)
-    casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Gp_tab'], gaintype='G', calmode='p', 
-                 gaintable=[tab['K_tab']], refant=ref_ant, solint='32s')
-    os.system(f'{ragavi_command} --table {tab['Gp_tab']} --yaxis phase --plotname ./PLOTS/cal_BP-Gp-cc{cc}.png >> ragavi.log')
-    # plotms(vis=tab['Gp_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase')
     # one can now combine the scans and use different B as diagnostics
     casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', 
-                  gaintable=[tab['K_tab'],tab['Gp_tab']], combine='scan', solint='inf', refant=ref_ant)
+                  gaintable=[tab['Ginit_tab'], tab['K_tab']], combine='scan', solint='inf', refant=ref_ant)
     os.system(f'{ragavi_command} --table {tab['B_tab']} --plotname ./PLOTS/cal_BP-B-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
     # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
     casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Ga_tab'], gaintype='G', calmode='a', 
-                 gaintable=[tab['B_tab'],tab['K_tab'],tab['Gp_tab']], interp=['linear,linearflag'], refant=ref_ant)
+                 gaintable=[tab['B_tab'],tab['K_tab']], interp=['linear,linearflag'], refant=ref_ant)
     os.system(f'{ragavi_command} --table {tab['Ga_tab']} --yaxis amplitude --plotname ./PLOTS/cal_BP-Ga-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Ga_tab'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
+    casa.gaincal(vis=calms, field=BandPassCal, caltable=tab['Gp_tab'], gaintype='G', calmode='p', 
+                 gaintable=[tab['B_tab'],tab['K_tab']], interp=['linear,linearflag'], refant=ref_ant, solint='32s')
+    os.system(f'{ragavi_command} --table {tab['Gp_tab']} --yaxis phase --plotname ./PLOTS/cal_BP-Gp-cc{cc}.png >> ragavi.log')
+    # plotms(vis=tab['Gp_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 
     if cc == 0:
         casa.applycal(vis=calms, interp=['linear,linearflag', 'nearest', 'nearest'], flagbackup=False, 
@@ -277,15 +289,15 @@ for cc in range(2):
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak-flag.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
         os.system(f"{shadems_command} -x ANTENNA1 -y CORRECTED_DATA:real --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-ant.png' {calms} >> shadems.log") #important check for chosing the reference antenna, make sure that no antenna with extreme leakage is chosen  
 
-# re-do BP to use better flags - REMOVE?
-logger.info(f'Re-doing bandpass calibration with better flags...')
-casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', combine='scan', solint='inf',
-              gaintable=[tab['Df_tab'],tab['K_tab'],tab['Gp_tab']], interp=['linear,linearflag'], refant=ref_ant)
-os.system(f'{ragavi_command} --table {tab['B_tab']} --plotname ./PLOTS/cal_BP-B-ccFINAL.png >> ragavi.log')
+# re-do BP to use better flags - usually it gives worse results...
+#logger.info(f'Re-doing bandpass calibration with better flags...')
+#casa.bandpass(vis=calms, field=BandPassCal, caltable=tab['B_tab'], bandtype='B', combine='scan', solint='inf',
+#              gaintable=[tab['Df_tab'],tab['K_tab'],tab['Ginit_tab']], interp=['linear,linearflag'], refant=ref_ant)
+#os.system(f'{ragavi_command} --table {tab['B_tab']} --plotname ./PLOTS/cal_BP-B-ccFINAL.png >> ragavi.log')
 # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
 # plotms(vis=tab['B_tab'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
-os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp-FINAL.png' {calms} >> shadems.log")
-os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph-FINAL.png' {calms} >> shadems.log")
+#os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp-FINAL.png' {calms} >> shadems.log")
+#os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph-FINAL.png' {calms} >> shadems.log")
 
 ############################################################################
 # Bootrap secondary calibrator
@@ -340,12 +352,12 @@ for cc in range(2):
     # plotms(vis=tab['Kpol_tab'], coloraxis='antenna1', xaxis='time', yaxis='delay')
     # here we can use also secT to trace slow variations in the amp
     casa.gaincal(vis=calms, caltable=tab['Gppol_tab'], field=PolCal, gaintype='G', calmode='p', interp=['linear,linearflag','linear,linearflag'], 
-                gaintable=[tab['B_tab'], tab['Df_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab']], refant=ref_ant, solint='32s')
+                gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Kpol_tab']], refant=ref_ant, solint='32s')
     os.system(f'{ragavi_command} --table {tab["Gppol_tab"]} --yaxis phase --plotname ./PLOTS/cal_Pol-Gp-cc{cc}.png >> ragavi.log')
     # plotms(vis=tab['Gppol_tab'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 
     casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
-              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
+              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Kpol_tab'], tab['Gppol_tab']])
 
     if cc == 0:
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf.png' {calms} >> shadems.log")
@@ -355,7 +367,7 @@ for cc in range(2):
 
 # Xf that is constant within a scan, but it drift slowly with time, try not combining scans
 casa.polcal(vis=calms, caltable=tab['Xf_tab'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant, interp=['linear,linearflag','linear,linearflag'],
-   combine='', preavg=-1., gaintable=[tab['B_tab'], tab['Df_tab'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
+   combine='', preavg=-1., gaintable=[tab['B_tab'], tab['Df_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Kpol_tab'], tab['Gppol_tab']])
 os.system(f'{ragavi_command} --table {tab["Xf_tab"]} --yaxis phase --plotname ./PLOTS/cal_Pol-Xf.png >> ragavi.log')
 # plotms(vis=tab['Xf_tab'], xaxis='freq', yaxis='phase')
 logger.info('Crosscal: Correcting for phase ambiguity')
@@ -366,7 +378,7 @@ os.system(f'{ragavi_command} --table {tab["Xf_tab_ambcorr"]} --yaxis phase --plo
 logger.info('Applying calibration to PolCal and test imaging...')
 # Final applycal to PolCal to check pol quality
 casa.applycal(vis=calms, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
-              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Kpol_tab'], tab['Ga_tab'], tab['Tsec_tab'], tab['Gppol_tab']])
+              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ga_tab'], tab['Tsec_tab'], tab['Kpol_tab'], tab['Gppol_tab']])
 os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-postXf.png' {calms} >> shadems.log") # check if the amp are reduced and no big waves/spikes should be there
 
 # test image of the polcal - no update model!
@@ -386,7 +398,7 @@ casa.gaincal(vis=calms, caltable=tab['Gpsec_tab'], field=PhaseCal, gaintype='G',
 os.system(f'{ragavi_command} --table {tab['Gpsec_tab']} --yaxis phase --plotname ./PLOTS/cal_Sec-Gp-FINAL.png >> ragavi.log')
 # parang=True for polarised sources and Xf should also be applied, otherwise it absorbs part of the effect
 casa.gaincal(vis=calms, caltable=tab['Tsec_tab'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
-             gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab']])
+             gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ga_tab'], tab['Ksec_tab'], tab['Gpsec_tab']])
 os.system(f'{ragavi_command} --table {tab['Tsec_tab']} --yaxis amplitude --plotname ./PLOTS/cal_Sec-Ta-FINAL.png >> ragavi.log')
 
 #######################################################################################################################################
@@ -405,7 +417,7 @@ print_flags(tgtms)
 
 logger.info('Applying calibration to target...')
 casa.applycal(vis=tgtms, parang=False, flagbackup=False, interp=['linear,linearflag', 'linear,linearflag', 'linear,linearflag'], \
-              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ksec_tab'], tab['Ga_tab'], tab['Gpsec_tab'], tab['Tsec_tab']])
+              gaintable=[tab['B_tab'], tab['Df_tab'], tab['Xf_tab_ambcorr'], tab['Ga_tab'], tab['Ksec_tab'], tab['Gpsec_tab'], tab['Tsec_tab']])
 print_flags(tgtms)
 
 # Standard flagging for shadowing, zero-clip, and auto-correlation
@@ -435,7 +447,7 @@ print_flags(tgtavgms)
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
 casa.flagmanager(vis=tgtavgms, mode='save', versionname='PreSelfcal')
 casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
-for cc in range(30):
+for cc in range(1):
     # ok for m87 sband
     os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{cc}  -update-model-required -pol I \
           -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
