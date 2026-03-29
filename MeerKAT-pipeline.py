@@ -247,8 +247,8 @@ for cc in range(2):
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph.png' {calms} >> shadems.log")
         
         os.system(f"{aoflagger_command} -strategy {aoflagger_strategy2} -column CORRECTED_DATA {calms} >> aoflagger.log")
-        casa.flagdata(vis=calms, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
-        casa.flagdata(vis=calms, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False)
+        casa.flagdata(vis=calms, mode="rflag", datacolumn="residual", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+        casa.flagdata(vis=calms, mode='extend', datacolumn='residual', field=BandPassCal, growtime=80, growfreq=80, flagbackup=False)
         print_flags(calms)
 
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp-flag.png' {calms} >> shadems.log")
