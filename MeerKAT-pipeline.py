@@ -136,7 +136,7 @@ if central_freq < 1:
      spw_good = '0:842~869MHz'
 elif central_freq > 2: 
      band = "S"
-     spw_good = '0:2010~1096MHz'
+     spw_good = '0:2010~2096MHz'
 else: 
      band = "L"
      spw_good = '0:1326~1367MHz'
@@ -167,12 +167,14 @@ for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
     if cal == 'J1939-6342':
         if band == "UHF":
             logger.info('-- setting UHF-band model for flux calibrator J1939-6342')
+            casa.clearcal(vis=calms, addmodel=True)
             os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parsets/J1939-6342_UHF.txt')} -f {cal} -j 2" )
         else:
             casa.setjy(vis = calms, field = cal, standard = 'Stevens-Reynolds 2016', usescratch = True)
     elif cal == 'J0408-6545':
         if band == "UHF":
             logger.info('-- setting UHF-band model for flux calibrator J0408-6545')
+            casa.clearcal(vis=calms, addmodel=True)
             os.system( f"crystalball {calms} -sm {os.path.join(script_dir, 'parsets/J0408-6545_UHF.txt')} -f {cal} -j 2" )
         else:
             a=-0.9790; b=3.3662; c=-1.1216; d=0.0861
@@ -447,7 +449,7 @@ print_flags(tgtavgms)
 # If diag phase needed, only for stokes I and consider parang is amp rot matrix and doesn't commute
 casa.flagmanager(vis=tgtavgms, mode='save', versionname='PreSelfcal')
 casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
-for cc in range(1):
+for cc in range(10):
     # ok for m87 sband
     os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{cc}  -update-model-required -pol I \
           -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
