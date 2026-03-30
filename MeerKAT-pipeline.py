@@ -131,13 +131,16 @@ msmd.open(calms)
 PhaseCal_id = msmd.fieldsforname(PhaseCal)[0]
 PolCal_id = msmd.fieldsforname(PolCal)[0]
 central_freq = msmd.chanfreqs(0).mean()/1e9 # central freq in GHz
-if central_freq < 1: 
+if central_freq < 1:
+     logger.info('Central frequency is %.2f GHz, assuming UHF band'%central_freq)
      band = "UHF"
      spw_good = '0:842~869MHz'
 elif central_freq > 2: 
+     logger.info('Central frequency is %.2f GHz, assuming S1 band'%central_freq) 
      band = "S"
      spw_good = '0:2517~2603MHz'
 else: 
+     logger.info('Central frequency is %.2f GHz, assuming L band'%central_freq)
      band = "L"
      spw_good = '0:1326~1367MHz'
 msmd.close()
@@ -154,9 +157,10 @@ pixelscale = round(0.7 * (2.4/central_freq), 1) # arcsec
 casa.flagdata(vis=calms, flagbackup=False, mode='shadow')
 casa.flagdata(vis=calms, flagbackup=False, mode='manual', autocorr=True)
 casa.flagdata(vis=calms, flagbackup=False, mode='clip', clipzeros=True)#, clipminmax=[0.0, 100.0])
+# clip band edges and known bad regions
 if band == "UHF": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:0~570MHz, *:925~945MHz, *:950~960MHz, *:1061~1090MHz') # UHF bad data
 if band == "L": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:856~880MHz, *:1658~1800MHz, *:1419.8~1421.3MHz') # suggested by SARAO for Lband
-if band == "S": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='0:850~900,0:1610~1660') # resonances S1 band
+if band == "S": casa.flagdata(vis=calms, flagbackup=False, mode='manual', spw='*:0~2010MHz, *:2800~2860MHz, *:2150~2161MHz, *:2312~2324MHz, *:2198~2203MHz, *:2251.5~2253.5MHz, *:2361~2366MHz, *:2491.5~2492.5MHz') # resonances+RFI S1 band
 
 if band == "UHF" or band == "L": os.system(f"{mask_ms_command} --mask {rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {calms}")
 print_flags(calms)
@@ -460,10 +464,11 @@ for cc in range(10):
           -auto-mask 5 -auto-threshold 3 \
           {tgtavgms} > wsclean_{Targets}-selfcal.log')
     
-    os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/Tgt-c{cc}.png' {tgtavgms} >> shadems.log")
-    casa.flagdata(vis=tgtavgms, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
-    casa.flagdata(vis=tgtavgms, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
-    os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/Tgt-c{cc}-flag.png' {tgtavgms} >> shadems.log")
+    if cc == 1 or cc == 3:
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/Tgt-c{cc}.png' {tgtavgms} >> shadems.log")
+        casa.flagdata(vis=tgtavgms, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
+        casa.flagdata(vis=tgtavgms, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
+        os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/Tgt-c{cc}-flag.png' {tgtavgms} >> shadems.log")
 
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %cc, gaintype='K', solint='32s', refant=ref_ant, parang=False)
     os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.K --plotname ./PLOTS/target-K-i{cc:02d}.png >> ragavi.log')
