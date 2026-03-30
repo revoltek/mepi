@@ -136,7 +136,7 @@ if central_freq < 1:
      spw_good = '0:842~869MHz'
 elif central_freq > 2: 
      band = "S"
-     spw_good = '0:2010~2096MHz'
+     spw_good = '0:2517~2603MHz'
 else: 
      band = "L"
      spw_good = '0:1326~1367MHz'
