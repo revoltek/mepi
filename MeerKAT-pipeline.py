@@ -15,7 +15,6 @@ invis   = 'RawData/m87sband-flipped.MS'
 calms   = 'MS_Files/m87sband-cal.MS'
 tgtms   = 'MS_Files/m87sband-tgt.MS'
 tgtavgms   = 'MS_Files/m87sband-tgt-avg.MS'
-FluxCal = 'J1939-6342' # one of the BandPassCals
 BandPassCal = 'J1939-6342,J0408-6545'
 PolCal = 'J1331+3030'
 PhaseTargetDic = {'J1150-0023':'M87'} # PhaseCal <--> Target pairs
@@ -27,7 +26,6 @@ invis   = 'RawData/a2163-flipped.MS/'
 calms   = 'MS_Files/a2163-cal.MS'
 tgtms   = 'MS_Files/a2163-tgt.MS'
 tgtavgms   = 'MS_Files/a2163-tgt-avg.MS'
-FluxCal = 'J1939-6342' # one of the BandPassCals
 BandPassCal = 'J1939-6342' # J0408-6545
 PolCal = 'J1331+3030'
 PhaseTargetDic = {'J1550+0527':'A2163'} # PhaseCal <--> Target pairs
@@ -168,7 +166,7 @@ if band == "UHF" or band == "L": os.system(f"{mask_ms_command} --mask {rfimask} 
 print_flags(calms)
 
 # Set flux density scale
-for cal in set(FluxCal.split(',')+BandPassCal.split(',')+PolCal.split(',')):
+for cal in set(BandPassCal.split(',')+PolCal.split(',')):
     logger.info('Setting model for calibrator %s' % cal)
     if cal == 'J1939-6342':
         if band == "UHF":
