@@ -482,7 +482,7 @@ for cc in range(10):
     # plotms(vis='CASA_Tables/selfcal%02i.Gp' %cc, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.Ga' %cc, gaintype='T', calmode='a', solint='128s', refant=ref_ant, solnorm=True, parang=True,
                  gaintable=['CASA_Tables/selfcal%02i.K' %cc, 'CASA_Tables/selfcal%02i.Gp' %cc])
-    os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Ga --yaxis amp --plotname ./PLOTS/target-Ga-i{cc:02d}.png >> ragavi.log')
+    os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.Ga --yaxis amplitude --plotname ./PLOTS/target-Ga-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.Ga' %cc, coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
     #casa.bandpass(vis=tgtavgms, caltable='selfcal%02i.B' %cc, combine='', solint='300s', gaintable=['selfcal%02i.G' %cc, 'selfcal%02i.K' %cc], refant='m002', parang=False)
     casa.applycal(vis=tgtavgms, flagbackup=False, parang=True,
