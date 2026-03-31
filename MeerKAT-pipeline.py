@@ -20,6 +20,8 @@ BandPassCal = 'J1939-6342,J0408-6545'
 PolCal = 'J1331+3030'
 PhaseTargetDic = {'J1150-0023':'M87'} # PhaseCal <--> Target pairs
 ref_ant = 'm063' # longest BL
+freqbin = 1 # number of channel to average for the target split
+timebin = '0s' # time binning for the target split
 
 invis   = 'RawData/a2163-flipped.MS/'
 calms   = 'MS_Files/a2163-cal.MS'
@@ -30,6 +32,8 @@ BandPassCal = 'J1939-6342' # J0408-6545
 PolCal = 'J1331+3030'
 PhaseTargetDic = {'J1550+0527':'A2163'} # PhaseCal <--> Target pairs
 ref_ant = 'm063'
+freqbin = 4 # number of channel to average for the target split
+timebin = '0s' # time binning for the target split
 
 #script_dir = os.path.dirname(os.path.abspath(__file__))
 script_dir = '/home/baq1889/opt/src/mepi/'
@@ -40,8 +44,6 @@ losoto_parset = os.path.join(script_dir, 'parsets/losoto-plot.parset')
 dp3_sol_parset = os.path.join(script_dir, 'parsets/DP3-sol.parset')
 dp3_cor_parset = os.path.join(script_dir, 'parsets/DP3-cor.parset')
 spw_selection = '' # channel selection - here is what we keep in the split command - '0:210~3841' range is for band=S1
-freqbin = 1 # number of channel to average for the target split
-timebin = '0s' # time binning for the target split
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 from lib_mepi import *
@@ -454,6 +456,7 @@ print_flags(tgtavgms)
 casa.flagmanager(vis=tgtavgms, mode='save', versionname='PreSelfcal')
 casa.applycal(vis=tgtavgms, flagbackup=False, parang=True)
 for cc in range(10):
+    logger.info(f'Self-calibration cycle {cc+1}')
     # ok for m87 sband
     os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-c{cc}  -update-model-required -pol I \
           -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
@@ -465,11 +468,13 @@ for cc in range(10):
           {tgtavgms} > wsclean_{Targets}-selfcal.log')
     
     if cc == 1 or cc == 3:
+        logger.info(f'Flagging data for self-calibration cycle {cc+1}')
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/Tgt-c{cc}.png' {tgtavgms} >> shadems.log")
         casa.flagdata(vis=tgtavgms, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
         casa.flagdata(vis=tgtavgms, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
         os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/Tgt-c{cc}-flag.png' {tgtavgms} >> shadems.log")
 
+    logger.info(f'Calibrating data for self-calibration cycle {cc+1}')
     casa.gaincal(vis=tgtavgms, caltable='CASA_Tables/selfcal%02i.K' %cc, gaintype='K', solint='32s', refant=ref_ant, parang=False)
     os.system(f'{ragavi_command} --table CASA_Tables/selfcal{cc:02d}.K --plotname ./PLOTS/target-K-i{cc:02d}.png >> ragavi.log')
     # plotms(vis='CASA_Tables/selfcal%02i.K' %cc, coloraxis='antenna1', xaxis='time', yaxis='delay')
