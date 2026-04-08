@@ -2,6 +2,9 @@ import numpy as np
 import casatasks as casa
 from casatools import table
 import time 
+from mepi import lib_log
+
+log = lib_log.logger
 
 #### Functions needed for J0408-6545 from https://skaafrica.atlassian.net/wiki/spaces/ESDKB/pages/1481408634/Flux+and+bandpass+calibration
 def casa_flux_model(lnunu0, iref, *args):
