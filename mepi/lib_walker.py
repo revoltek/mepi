@@ -21,7 +21,7 @@ class Walker():
 
     Adopted from https://stackoverflow.com/questions/12594148/skipping-execution-of-with-block
     """
-    def __init__(self, filename='mepi.walker', pipeline=None):
+    def __init__(self, pipeline=None, filename='mepi.walker'):
         open(filename, 'a').close() # create the file if doesn't exists
         self.filename = os.path.abspath(filename)
         self.pipeline = pipeline
