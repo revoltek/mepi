@@ -69,10 +69,9 @@ class Walker():
             with open(self.filename, "a") as f:
                 delta_td = datetime.datetime.now() - self.__timeinit__
                 total_seconds = int(delta_td.total_seconds())
-                days, rem = divmod(total_seconds, 86400)
-                hours, rem = divmod(rem, 3600)
+                hours, rem = divmod(total_seconds, 3600)
                 minutes, seconds = divmod(rem, 60)
-                delta = f"{days}d {hours}h {minutes}m {seconds}s"
+                delta = f"{hours}h {minutes}m {seconds}s"
                 f.write(f"{self.__step__} # {delta}\n")
             log.info('\033[92m<< done << {}\033[0m - {}'.format(self.__step__, delta))
             return  # No exception
