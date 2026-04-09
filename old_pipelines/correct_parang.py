@@ -223,6 +223,7 @@ if not args.noparang:
 
 with tbl(args.ms+"::POLARIZATION", ack=False) as t:
     poltype = t.getcol("CORR_TYPE")[poldescsel]
+    print("poltype", poldescsel, poltype,t.getcol("CORR_TYPE"))
     # must be linear
     if any(poltype - np.array([9,10,11,12]) != 0):
         raise RuntimeError("Must be full correlation linear system being corrected")

@@ -4,7 +4,7 @@ from casatools import msmetadata
 from casatools import table as tbtool
 from contextlib import contextmanager
 
-log = lib_log.logger
+log = lib_log.log
 
 # this is missing in casatools.table, so we wrap it in a context manager to ensure proper closing
 @contextmanager
@@ -187,7 +187,7 @@ class MS:
         """        
 
         # Change RECEPTOR_ANGLE : DEFAULT IS -90DEG but should be fixed with the initial swap and set to 0 for the correct interpretation of the polarisation.
-        with open_table(self.msfile+'/FEED') as tb:
+        with open_table(self.msfile+'::FEED') as tb:
             feed_angle = tb.getcol('RECEPTOR_ANGLE')
             if np.all(feed_angle == 0):
                 self.log.info("Feeds already flipped, skipping.")
@@ -195,14 +195,18 @@ class MS:
 
         self.log.info("Flipping feeds for datacolumn: '{}'".format(column))
 
+        with open_table(self.msfile+"::DATA_DESCRIPTION") as t:
+            spwsel = t.getcol("SPECTRAL_WINDOW_ID")[0]
+            poldescsel = t.getcol("POLARIZATION_ID")[0]
+
         with open_table(self.msfile+"::POLARIZATION") as t:
-                poltype = t.getcol("CORR_TYPE")[0]
+                poltype = t.getcol("CORR_TYPE").T[poldescsel] # trasnpose is only necessary if using CASA tables, not if using pyrap tables
                 # must be linear
                 if any(poltype - np.array([9,10,11,12]) != 0):
                     raise RuntimeError("Must be full correlation linear system being corrected")
 
         with open_table(self.msfile+"::SPECTRAL_WINDOW") as t:
-                chan_freqs = t.getcol("CHAN_FREQ")[0]
+                chan_freqs = t.getcol("CHAN_FREQ").T[spwsel]
                 nchan = chan_freqs.size
             
             #timepaunix = np.array(list(map(lambda x: x.replace(tzinfo=pytz.UTC).timestamp(), timepadt)))
@@ -213,10 +217,10 @@ class MS:
             for ci in range(nchunk):
                 cl = ci * 1000
                 crow = min(nrow - ci * 1000, 1000)
-                data = t.getcol(column, startrow=cl, nrow=crow)
-                if data.shape[2] != 4:
+                data = t.getcol(column, startrow=cl, nrow=crow)  # shape: (4, nchan, crow)
+                if data.shape[0] != 4:
                     raise RuntimeError("Data must be full correlation")
-                data = data.reshape(crow, nchan, 2, 2)
+                data = data.T.reshape(crow, nchan, 2, 2)  # -> (crow, nchan, 2, 2)
 
                 def give_crossphase_mat(phase, nrow, nchan, conjugate=False):
                     ones = np.ones(nchan*nrow)
@@ -237,9 +241,9 @@ class MS:
                 JA1 = np.matmul(FVmat, XA1)
                 JA2 = np.matmul(XA2, FVmat)
 
-                corr_data = np.matmul(JA1, np.matmul(data, JA2)).reshape(crow, nchan, 4)
+                corr_data = np.matmul(JA1, np.matmul(data, JA2)).reshape(crow, nchan, 4).T  # -> (4, nchan, crow)
                 t.putcol(column, corr_data, startrow=cl, nrow=crow)
-                self.log.info("\tCorrected chunk {}/{}".format(ci+1, nchunk))
+                self.log.debug("\tCorrected chunk {}/{}".format(ci+1, nchunk))
                 nrowsput += crow
             assert nrow == nrowsput
 
