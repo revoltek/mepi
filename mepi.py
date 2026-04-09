@@ -106,7 +106,7 @@ def main():
         log_file='mepi.log',
         casa_log='mepi_casa.log',
     )
-    log = lib_log.logger
+    log = lib_log.log
 
     # Add the mepi package directory to sys.path so pipeline modules are importable
     cfg['script_dir'] = mepi_dir

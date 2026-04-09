@@ -5,6 +5,20 @@ from mepi import lib_log
 
 log = lib_log.logger
 
+# external commands:
+# tricolour_command = f'singularity run --bind $PWD -B /local/work/fdg ~/storage/tricolour.simg tricolour'
+shadems_command = f'shadems --no-lim-save'
+aoflagger_command = f'aoflagger -v -j 64'
+wsclean_command = f'wsclean -j 64'
+mask_ms_command = os.path.join(cfg['mepi_dir'], 'mask_ms.py')
+ragavi_command = 'ragavi-gains'
+crystalball_command = 'crystalball'
+
+# some parsets
+aoflagger_strategy1 = os.path.join(cfg['mepi_dir'], 'parsets/aoflagger_StokesI.lua')
+aoflagger_strategy2 = os.path.join(cfg['mepi_dir'], 'parsets/aoflagger_StokesQUV.lua')
+rfimask = os.path.join(cfg['mepi_dir'], 'parsets/meerkat.rfimask.npy') # ok for UHF and L
+
 def run_command(cmd, cfg, logname=None):
     """
     Run an external command, writing stdout and stderr to a log file under cfg['path_logs'].
