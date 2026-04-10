@@ -25,7 +25,7 @@ def run():
         else:
             ref_ant = ms_tgt.find_reference_antenna()
             log.info(f"Using automatically selected reference antenna: {ref_ant}")
-        pixelscale = round(0.7 * (2.4/ms_tgt.freq_center*1e-9), 1) # arcsec
+        pixelscale = round(0.7 * (2.4/(ms_tgt.freq_center*1e-9)), 1) # arcsec
 
         with w.if_todo("parang"):
             # selfcal only on scalar amp and possibly diag phase.

@@ -18,6 +18,12 @@ the script writes the output in the CORRECTED_DATA column and needs to be run *f
 Visibility plots are done with shadems https://github.com/ratt-ru/shadeMS
 Solution plots are done with ragavi-gains https://github.com/ratt-ru/ragavi
 
+The pipeline can be run with:
+
+`mepi.py mepi.conf --log-level DEBUG`
+
+with mepi.conf as the one in this repository.
+
 # RM
 
 ## Wsclean

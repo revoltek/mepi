@@ -22,7 +22,7 @@ class MS:
         self.log = log
         log.info(f"Opening MS: {msfile}")
         with open_table(self.msfile + '::SPECTRAL_WINDOW') as t:
-            self.freq_center = t.getcol('CHAN_FREQ')[0].mean() # Hz
+            self.freq_center = t.getcol('CHAN_FREQ').T[0].mean() # Hz - .T for casa tables, not needed for pyrap tables
         self.band = self.get_band()
 
     # Known band tokens in the SPECTRAL_WINDOW NAME (case-insensitive)

@@ -9,7 +9,7 @@ w = lib_walker.Walker("splittgt")
 def run():
 
     ms_full_file = cfg['ms_full']
-    ms_tgt_file = os.path.join(cfg['path_ms'], os.path.basename(ms_full_file.rstrip('/').rstrip('\\')).replace('.MS', '_tgt.MS'))
+    ms_tgt_file = os.path.join(cfg['path_ms'], os.path.basename(ms_full_file.rstrip('/').rstrip('\\')).replace('.MS', '_tgt.MS').replace('.ms', '_tgt.ms'))
     ms_full = lib_ms.MS(ms_full_file)
     # solution tables
     tab = lib_sol.tab
@@ -62,7 +62,7 @@ def run():
     log.info('Splitting target avg...')
     for target in ms_tgt.find_targets():
         log.info(f"Target {target}")
-        ms_tgtavg_file = ms_tgt_file.replace('.MS', f"_{target}.MS")
+        ms_tgtavg_file = ms_tgt_file.replace('.MS', f"_{target}.MS").replace('.ms', f"_{target}.ms")
         if not os.path.exists(ms_tgtavg_file):
             casa.split(vis = ms_tgt_file, outputvis = ms_tgtavg_file, field = f"{target}", datacolumn = 'corrected',
                     width=cfg['freqbin'], timebin=cfg['timebin'])

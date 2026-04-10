@@ -15,7 +15,7 @@ def run():
 
     # set filenames
     ms_full_file = cfg['ms_full']
-    ms_cal_file = os.path.join(cfg['path_ms'], os.path.basename(ms_full_file.rstrip('/').rstrip('\\')).replace('.MS', '_cal.MS'))
+    ms_cal_file = os.path.join(cfg['path_ms'], os.path.basename(ms_full_file.rstrip('/').rstrip('\\')).replace('.MS', '_cal.MS').replace('.ms', '_cal.ms'))
     ms_full = lib_ms.MS(ms_full_file)
     # solution tables
     tab = lib_sol.tab
@@ -55,7 +55,8 @@ def run():
     PolCal_id = msmd.fieldsforname(PolCal)[0]
     msmd.close()
     # imaging parameters scaled from S1 band
-    pixelscale = round(0.7 * (2.4/ms_cal.freq_center*1e-9), 1) # arcsec
+    pixelscale = round(0.7 * (2.4/(ms_cal.freq_center*1e-9)), 1) # arcsec
+    log.debug(f"Using pixel scale of {pixelscale} arcsec for imaging")
 
     #######################################################################################################################################
     #######################################################################################################################################
