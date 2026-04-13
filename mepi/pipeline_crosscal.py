@@ -250,7 +250,7 @@ def run():
                 # image the secondary and selfcal to improve the local model
                 casa.applycal(vis=ms_cal_file, field=PhaseCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
                             gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Ksec'], tab['Gpsec'], tab['Tsec']])
-                lib_runcode.run_wsclean.run(f'-name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
+                lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
                         -update-model-required -weight briggs -0.2 -size 8000 8000 \
                         -scale {pixelscale}arcsec -channels-out 12 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
                         -fit-spectral-pol 3 -deconvolution-channels 3 -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {ms_cal_file}')
@@ -310,7 +310,7 @@ def run():
         lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png '{cfg['path_plots']}/PolCal-cross-postXf.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
 
         # test image of the polcal - no update model!
-        lib_runcode.run_wsclean.run(f'-name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
+        lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
                 -no-update-model-required -weight briggs -0.2 -size 1000 1000 \
                 -scale {pixelscale}arcsec -channels-out 12 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
                 -multiscale -fit-spectral-pol 3 -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {ms_cal_file}')

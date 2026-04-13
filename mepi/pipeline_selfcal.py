@@ -38,7 +38,7 @@ def run():
             with w.if_todo(f"selfcal-cycle-{cc+1}"):
                 log.info(f'Self-calibration cycle {cc+1}')
                 # ok for m87 sband
-                lib_runcode.run_wsclean.run(f'-name IMG/{target}-selfcal-c{cc}  -update-model-required -pol I \
+                lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{target}-selfcal-c{cc}  -update-model-required -pol I \
                     -reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 \
                     -size 5000 5000 -scale {pixelscale}arcsec -weight briggs -0.2  \
                     -niter 1000000 -mgain 0.8 \
@@ -71,7 +71,7 @@ def run():
                 lib_mepi.print_flags(ms_tgt_file)
 
         # pol cleaning - possible problem with -squared-channel-joining when using -multiscale
-        #os.system(f'{wsclean_command} -name IMG/{Targets}-selfcal-pol -update-model-required -pol IQUV '
+        #os.system(f'{wsclean_command} -name {cfg['path_imgs']}/{Targets}-selfcal-pol -update-model-required -pol IQUV '
         #          f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
         #          f'-size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2 -minuv-l 80.0 '
         #          f'-niter 1000000 -mgain 0.7 '
@@ -82,13 +82,13 @@ def run():
 
         # wsclean with rm
         restoring_beam = 6.0 # arcsec - this is ok for S1 band
-        lib_runcode.run_wsclean.run(f'-name IMG/{target}-rm -no-update-model-required -pol QU '
+        lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{target}-rm -no-update-model-required -pol QU '
                 f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
                 f'-size 5000 5000 -scale 2arcsec -weight briggs -0.2 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
                 f'-niter 25000 -mgain 0.75 -nmiter 12 '
                 f'-join-channels -channels-out 125 -join-polarizations -squared-channel-joining -fit-rm {ms_tgt_file}')
         # relative I stokes for fractional Pol
-        lib_runcode.run_wsclean.run(f'-name IMG/{target}-rm -no-update-model-required -pol I '
+        lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{target}-rm -no-update-model-required -pol I '
                 f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
                 f'-size 5000 5000 -scale 2arcsec -weight briggs -0.2 -minuv-l 80.0 -beam-size {restoring_beam} -taper-gaussian {restoring_beam}arcsec '
                 f'-niter 25000 -mgain 0.75 -nmiter 12 '

@@ -66,6 +66,7 @@ class Run_command():
 
         if result.returncode != 0:
             msg = f'Command failed (exit {result.returncode}): {cmd if shell else " ".join(cmd)}'
+            msg += f'\nSee log file: {logfile}'
             log.error(msg)
             raise RuntimeError(msg)
 
