@@ -48,22 +48,22 @@ def run():
                 
                 if cc == 1 or cc == 3:
                     log.info(f'Flagging data for self-calibration cycle {cc+1}')
-                    lib_runcode.run_shadems.run(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/{target}-c{cc}.png' {ms_tgt_file}")
+                    lib_runcode.run_shadems.run(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}.png' {ms_tgt_file}")
                     casa.flagdata(vis=ms_tgt_file, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
                     casa.flagdata(vis=ms_tgt_file, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
-                    lib_runcode.run_shadems.run(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png './PLOTS/{target}-c{cc}-flag.png' {ms_tgt_file}")
+                    lib_runcode.run_shadems.run(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}-flag.png' {ms_tgt_file}")
 
                 log.info(f'Calibrating data for self-calibration cycle {cc+1}')
                 casa.gaincal(vis=ms_tgt_file, caltable=tab['K'] %cc, gaintype='K', solint='32s', refant=ref_ant, parang=False)
-                lib_runcode.run_ragavi.run(f'--table {tab["K"] %cc} --plotname ./PLOTS/{target}-K-i{cc:02d}.png')
+                lib_runcode.run_ragavi.run(f'--table {tab["K"] %cc} --plotname {cfg['path_plots']}/{target}-K-i{cc:02d}.png')
                 # plotms(vis='CASA_Tables/selfcal%02i.K' %cc, coloraxis='antenna1', xaxis='time', yaxis='delay')
                 casa.gaincal(vis=ms_tgt_file, caltable=tab['Gp'] %cc,  gaintype='G', calmode='p', solint='32s', refant=ref_ant, parang=False,
                             gaintable=[tab['K'] %cc])
-                lib_runcode.run_ragavi.run(f'--table {tab["Gp"] %cc} --yaxis phase --plotname ./PLOTS/{target}-Gp-i{cc:02d}.png')
+                lib_runcode.run_ragavi.run(f'--table {tab["Gp"] %cc} --yaxis phase --plotname {cfg['path_plots']}/{target}-Gp-i{cc:02d}.png')
                 # plotms(vis='CASA_Tables/selfcal%02i.Gp' %cc, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
                 casa.gaincal(vis=ms_tgt_file, caltable=tab['Ga'] %cc, gaintype='T', calmode='a', solint='128s', refant=ref_ant, solnorm=True, parang=True,
                             gaintable=[tab['K'] %cc, tab['Gp'] %cc])
-                lib_runcode.run_ragavi.run(f'--table {tab["Ga"] %cc} --yaxis amplitude --plotname ./PLOTS/{target}-Ga-i{cc:02d}.png')
+                lib_runcode.run_ragavi.run(f'--table {tab["Ga"] %cc} --yaxis amplitude --plotname {cfg['path_plots']}/{target}-Ga-i{cc:02d}.png')
                 # plotms(vis='CASA_Tables/selfcal%02i.Ga' %cc, coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
                 #casa.bandpass(vis=ms_tgt_file, caltable='selfcal%02i.B' %cc, combine='', solint='300s', gaintable=['selfcal%02i.G' %cc, 'selfcal%02i.K' %cc], refant='m002', parang=False)
                 casa.applycal(vis=ms_tgt_file, flagbackup=False, parang=True,
