@@ -1,4 +1,6 @@
-import os
+import os, time
+from casatools import table
+import numpy as np
 from mepi import lib_log, lib_cfg
 
 log = lib_log.log

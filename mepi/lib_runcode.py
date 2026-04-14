@@ -38,7 +38,7 @@ class Run_command():
 
         Parameters
         ----------
-        params : str or list
+        params : str
             Parameters to run (passed to subprocess with shell=True if str).
         logname : str, optional
             Base name for the log file (without extension). Defaults to the
@@ -50,6 +50,7 @@ class Run_command():
             If the command returns a non-zero exit code.
         """
 
+        params = ' '.join(params.split()) # normalize whitespace
         cmd = self.command + ' ' + params
 
         if logname is None:
