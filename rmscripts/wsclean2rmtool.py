@@ -225,6 +225,17 @@ class Channel:
             if 'DATAMAX' in header:
                 del header['DATAMAX']
 
+    def is_all_nan(self):
+        """
+        Check if all pixels in the data are NaN.
+        
+        Returns:
+        --------
+        bool
+            True if all pixels in Q or U data are NaN, False otherwise
+        """
+        return np.isnan(self.data_q).all() or np.isnan(self.data_u).all()
+
 def parse_ds9_regions(region_file, wcs):
     """
     Parse DS9 region file and create a mask.
@@ -358,7 +369,11 @@ def main():
         if match_q:
             filename_q = filename
             filename_u = re.sub(r"-Q-image\.fits$", "-U-image.fits", filename)
-            channels.append(Channel(filename_q, filename_u, label=filename))
+            ch = Channel(filename_q, filename_u, label=filename)
+            if ch.is_all_nan():
+                print(f"{filename}: All pixels are NaN, skipping this channel")
+            else:
+                channels.append(ch)
      
     if len(channels) == 0:
         print("No Q/U files found matching the pattern.")
