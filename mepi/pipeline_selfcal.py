@@ -48,10 +48,10 @@ def run():
                 
                 if cc == 1 or cc == 3:
                     log.info(f'Flagging data for self-calibration cycle {cc+1}')
-                    lib_runcode.run_shadems.run(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}.png' {ms_tgt_file}")
+                    lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}.png' {ms_tgt_file}")
                     casa.flagdata(vis=ms_tgt_file, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
                     casa.flagdata(vis=ms_tgt_file, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
-                    lib_runcode.run_shadems.run(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}-flag.png' {ms_tgt_file}")
+                    lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}-flag.png' {ms_tgt_file}")
 
                 log.info(f'Calibrating data for self-calibration cycle {cc+1}')
                 casa.gaincal(vis=ms_tgt_file, caltable=tab['K'], gaintype='K', solint='32s', refant=ref_ant, parang=False)
@@ -71,14 +71,14 @@ def run():
                 lib_mepi.print_flags(ms_tgt_file)
 
         # pol cleaning - possible problem with -squared-channel-joining when using -multiscale
-        #os.system(f'{wsclean_command} -name {cfg['path_imgs']}/{Targets}-selfcal-pol -update-model-required -pol IQUV '
+        #lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{Targets}-selfcal-pol -update-model-required -pol IQUV '
         #          f'-reorder -parallel-reordering 5 -parallel-gridding 64 -parallel-deconvolution 1024 -baseline-averaging 12 '
         #          f'-size 2500 2500 -scale {pixelscale}arcsec -weight briggs -0.2 -minuv-l 80.0 '
         #          f'-niter 1000000 -mgain 0.7 '
         #         f'-join-channels -channels-out 32 -deconvolution-channels 6 -fit-spectral-pol 3 -squared-channel-joining '
         #          f'-multiscale -multiscale-scales 1,4,8,16,32,64,128,256 '
         #          f'-auto-threshold 3 -fits-mask m87-07asec-2500.fits '
-        #          f'{ms_tgt_file} > wsclean_{Targets}-selfcal.log')
+        #          f'{ms_tgt_file}')
 
         # wsclean with rm
         restoring_beam = 6.0 # arcsec - this is ok for S1 band
