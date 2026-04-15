@@ -9,7 +9,7 @@ def run():
 
     ms_full_file = cfg['ms_full']
 
-    for ms_tgt_file in glob.glob(os.path.join(cfg['path_ms'], os.path.basename(ms_full_file.rstrip('/').rstrip('\\')).replace('.MS', '_tgt*.MS').replace('.ms', '_tgt*.ms'))):
+    for ms_tgt_file in glob.glob(os.path.join(cfg['path_ms'], os.path.basename(ms_full_file.rstrip('/').rstrip('\\')).replace('.MS', '_tgt_*.MS').replace('.ms', '_tgt_*.ms'))):
         ms_tgt = lib_ms.MS(ms_tgt_file)
         target = ms_tgt.find_targets()[0] # todo: handle multiple targets
         w = lib_walker.Walker(f"selfcal-{target}")
