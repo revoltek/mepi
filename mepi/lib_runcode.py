@@ -31,8 +31,14 @@ class Run_command():
         elif type == 'crystalball':
             self.command = 'crystalball'
             self.logname = 'crystalball'
+        elif type == 'facetselfcal':
+            self.command = 'facetselfcal'
+            self.logname = 'facetselfcal'
+        elif type == 'dp3':
+            self.command = 'DP3'
+            self.logname = 'DP3'
 
-    def run(self, params, logname=None):
+    def run(self, params, logname=None, cwd=None):
         """
         Run an external command, writing stdout and stderr to a log file under cfg['path_logs'].
 
@@ -43,6 +49,8 @@ class Run_command():
         logname : str, optional
             Base name for the log file (without extension). Defaults to the
             first word of the command.
+        cwd : str, optional
+            Working directory to run the command in. Defaults to None (current directory).
 
         Raises
         ------
@@ -56,14 +64,14 @@ class Run_command():
         if logname is None:
             logname = self.logname
 
-        logdir = cfg['path_logs']
+        logdir = os.path.abspath(cfg['path_logs'])
         logfile = os.path.join(logdir, f'{logname}.log')
 
         shell = isinstance(cmd, str)
         log.info(f'Running: {cmd if shell else " ".join(cmd)}')
 
         with open(logfile, 'a') as fh:
-            result = subprocess.run(cmd, shell=shell, stdout=fh, stderr=subprocess.STDOUT)
+            result = subprocess.run(cmd, shell=shell, stdout=fh, stderr=subprocess.STDOUT, cwd=cwd)
 
         if result.returncode != 0:
             msg = f'Command failed (exit {result.returncode}): {cmd if shell else " ".join(cmd)}'
@@ -78,6 +86,8 @@ run_aoflagger = Run_command('aoflagger')
 run_mask_ms = Run_command('mask_ms')
 run_ragavi = Run_command('ragavi')
 run_crystalball = Run_command('crystalball')
+run_dp3 = Run_command('dp3')
+run_facetselfcal = Run_command('facetselfcal')
 
 # some parsets
 aoflagger_strategy1 = os.path.join(cfg['mepi_dir'], 'parsets/aoflagger_StokesI.lua')
