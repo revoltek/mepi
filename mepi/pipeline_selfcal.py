@@ -17,7 +17,7 @@ def run():
 
         tab = {'K' : 'delay.cal',
                'Gp' : 'gain_p.cal',
-               'T' : 'gain_a.cal'}
+               'Ga' : 'gain_a.cal'}
 
         if cfg['ref_ant'] is not None:
             ref_ant = cfg['ref_ant']
