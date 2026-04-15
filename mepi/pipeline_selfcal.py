@@ -54,20 +54,20 @@ def run():
                     lib_runcode.run_shadems.run(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}-flag.png' {ms_tgt_file}")
 
                 log.info(f'Calibrating data for self-calibration cycle {cc+1}')
-                casa.gaincal(vis=ms_tgt_file, caltable=tab['K'] %cc, gaintype='K', solint='32s', refant=ref_ant, parang=False)
-                lib_runcode.run_ragavi.run(f'--table {tab["K"] %cc} --plotname {cfg['path_plots']}/{target}-K-i{cc:02d}.png')
+                casa.gaincal(vis=ms_tgt_file, caltable=tab['K'], gaintype='K', solint='32s', refant=ref_ant, parang=False)
+                lib_runcode.run_ragavi.run(f'--table {tab["K"]} --plotname {cfg['path_plots']}/{target}-K-i{cc:02d}.png')
                 # plotms(vis='CASA_Tables/selfcal%02i.K' %cc, coloraxis='antenna1', xaxis='time', yaxis='delay')
-                casa.gaincal(vis=ms_tgt_file, caltable=tab['Gp'] %cc,  gaintype='G', calmode='p', solint='32s', refant=ref_ant, parang=False,
-                            gaintable=[tab['K'] %cc])
-                lib_runcode.run_ragavi.run(f'--table {tab["Gp"] %cc} --yaxis phase --plotname {cfg['path_plots']}/{target}-Gp-i{cc:02d}.png')
+                casa.gaincal(vis=ms_tgt_file, caltable=tab['Gp'],  gaintype='G', calmode='p', solint='32s', refant=ref_ant, parang=False,
+                            gaintable=[tab['K']])
+                lib_runcode.run_ragavi.run(f'--table {tab["Gp"]} --yaxis phase --plotname {cfg['path_plots']}/{target}-Gp-i{cc:02d}.png')
                 # plotms(vis='CASA_Tables/selfcal%02i.Gp' %cc, coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
-                casa.gaincal(vis=ms_tgt_file, caltable=tab['Ga'] %cc, gaintype='T', calmode='a', solint='128s', refant=ref_ant, solnorm=True, parang=True,
-                            gaintable=[tab['K'] %cc, tab['Gp'] %cc])
-                lib_runcode.run_ragavi.run(f'--table {tab["Ga"] %cc} --yaxis amplitude --plotname {cfg['path_plots']}/{target}-Ga-i{cc:02d}.png')
+                casa.gaincal(vis=ms_tgt_file, caltable=tab['Ga'], gaintype='T', calmode='a', solint='128s', refant=ref_ant, solnorm=True, parang=True,
+                            gaintable=[tab['K'], tab['Gp']])
+                lib_runcode.run_ragavi.run(f'--table {tab["Ga"]} --yaxis amplitude --plotname {cfg['path_plots']}/{target}-Ga-i{cc:02d}.png')
                 # plotms(vis='CASA_Tables/selfcal%02i.Ga' %cc, coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
                 #casa.bandpass(vis=ms_tgt_file, caltable='selfcal%02i.B' %cc, combine='', solint='300s', gaintable=['selfcal%02i.G' %cc, 'selfcal%02i.K' %cc], refant='m002', parang=False)
                 casa.applycal(vis=ms_tgt_file, flagbackup=False, parang=True,
-                            gaintable=[tab['K'] %cc, tab['Gp'] %cc, tab['Ga'] %cc])
+                            gaintable=[tab['K'], tab['Gp'], tab['Ga']])
                 lib_mepi.print_flags(ms_tgt_file)
 
         # pol cleaning - possible problem with -squared-channel-joining when using -multiscale
