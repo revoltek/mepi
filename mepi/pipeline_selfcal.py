@@ -49,8 +49,10 @@ def run():
                 if cc == 1 or cc == 3:
                     log.info(f'Flagging data for self-calibration cycle {cc+1}')
                     lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}.png' {ms_tgt_file}")
+                    lib_mepi.print_flags(ms_tgt_file)
                     casa.flagdata(vis=ms_tgt_file, mode="rflag", datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
                     casa.flagdata(vis=ms_tgt_file, mode='extend', datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
+                    lib_mepi.print_flags(ms_tgt_file)
                     lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --corr XX,YY --png '{cfg['path_plots']}/{target}-c{cc}-flag.png' {ms_tgt_file}")
 
                 log.info(f'Calibrating data for self-calibration cycle {cc+1}')
