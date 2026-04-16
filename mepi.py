@@ -64,7 +64,8 @@ def main():
         module_name = f"mepi.pipeline_{step}"
         try:
             module = importlib.import_module(module_name)
-            module.run()
+            with w.if_todo(step):
+                module.run()
         except ImportError as e:
             log.error(f"Failed to import module for step '{step}': {e}")
             sys.exit(1)

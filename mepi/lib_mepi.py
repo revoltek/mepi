@@ -1,7 +1,5 @@
 import numpy as np
 import casatasks as casa
-from casatools import table
-import time 
 from mepi import lib_log
 
 log = lib_log.log

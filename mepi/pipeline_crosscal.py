@@ -141,42 +141,42 @@ def run():
             # Pre gaincal
             casa.gaincal(vis=ms_cal_file, field=BandPassCal, caltable=tab['Ginit'], gaintype='G', calmode='ap', 
                         refant=ref_ant, solint='int', spw=ms_cal.get_good_spw(), solnorm=True)
-            lib_runcode.run_ragavi.run(f'--table {tab["Ginit"]} --plotname ./PLOTS/cal_BP-Ginit-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Ginit"]} --plotname {cfg['path_plots']}/cal_BP-Ginit-cc{cc}.png')
             # plotms(vis=tab['Ginit'], coloraxis='antenna1', xaxis='time', yaxis='phase')
             # Delay calibration (fast to track the ionosphere)
             casa.gaincal(vis=ms_cal_file, field=BandPassCal, caltable=tab['K'], gaintype='K', 
                         gaintable=[tab['Ginit']], refant=ref_ant, solint='32s')
-            lib_runcode.run_ragavi.run(f'--table {tab["K"]} --plotname ./PLOTS/cal_BP-K-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["K"]} --plotname {cfg['path_plots']}/cal_BP-K-cc{cc}.png')
             # plotms(vis=tab['K'], coloraxis='antenna1', xaxis='time', yaxis='delay') # all plotms should be run separately in a casa session
             # one can now combine the scans and use different B as diagnostics
             casa.bandpass(vis=ms_cal_file, field=BandPassCal, caltable=tab['B'], bandtype='B', 
                         gaintable=[tab['Ginit'], tab['K']], combine='scan', solint='inf', refant=ref_ant)
-            lib_runcode.run_ragavi.run(f'--table {tab["B"]} --plotname ./PLOTS/cal_BP-B-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["B"]} --plotname {cfg['path_plots']}/cal_BP-B-cc{cc}.png')
             # plotms(vis=tab['B'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
             # plotms(vis=tab['B'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
             casa.gaincal(vis=ms_cal_file, field=BandPassCal, caltable=tab['Ga'], gaintype='G', calmode='a', 
                         gaintable=[tab['B'],tab['K']], interp=['linear,linearflag'], refant=ref_ant)
-            lib_runcode.run_ragavi.run(f'--table {tab["Ga"]} --yaxis amplitude --plotname ./PLOTS/cal_BP-Ga-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Ga"]} --yaxis amplitude --plotname {cfg['path_plots']}/cal_BP-Ga-cc{cc}.png')
             # plotms(vis=tab['Ga'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
             casa.gaincal(vis=ms_cal_file, field=BandPassCal, caltable=tab['Gp'], gaintype='G', calmode='p', 
                         gaintable=[tab['B'],tab['K']], interp=['linear,linearflag'], refant=ref_ant, solint='32s')
-            lib_runcode.run_ragavi.run(f'--table {tab["Gp"]} --yaxis phase --plotname ./PLOTS/cal_BP-Gp-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Gp"]} --yaxis phase --plotname {cfg['path_plots']}/cal_BP-Gp-cc{cc}.png')
             # plotms(vis=tab['Gp'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 
             if cc == 0:
                 casa.applycal(vis=ms_cal_file, interp=['linear,linearflag', 'nearest', 'nearest'], flagbackup=False, 
                             gaintable=[tab['B'],tab['K'],tab['Gp'],tab['Ga']]) # apply to all fields for better rfi flagging
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp.png' {ms_cal_file}")
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph.png' {ms_cal_file}")
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-amp.png' {ms_cal_file}")
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-ph.png' {ms_cal_file}")
                 
                 lib_runcode.run_aoflagger.run(f"-strategy {lib_runcode.aoflagger_strategy2} -column CORRECTED_DATA {ms_cal_file}")
                 casa.flagdata(vis=ms_cal_file, mode="rflag", datacolumn="residual", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
                 casa.flagdata(vis=ms_cal_file, mode='extend', datacolumn='residual', field=BandPassCal, growtime=80, growfreq=80, flagbackup=False)
                 lib_mepi.print_flags(ms_cal_file)
 
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp-flag.png' {ms_cal_file}")
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph-flag.png' {ms_cal_file}")
-                lib_runcode.run_shadems.run(f"-x CORRECTED_DATA:phase -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass_ampph-flag.png' {ms_cal_file}")
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-amp-flag.png' {ms_cal_file}")
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-ph-flag.png' {ms_cal_file}")
+                lib_runcode.run_shadems.run(f"-x CORRECTED_DATA:phase -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass_ampph-flag.png' {ms_cal_file}")
 
     #############################################
     ### Leackage calibration
@@ -187,11 +187,11 @@ def run():
         # plot and flagging
         casa.applycal(vis=ms_cal_file, interp=['linear,linearflag'], flagbackup=False, 
                     field=BandPassCal, gaintable=[tab['B'],tab['K'],tab['Gp'],tab['Ga']])
-        lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak.png' {ms_cal_file}")
+        lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-preleak.png' {ms_cal_file}")
         #casa.flagdata(vis=ms_cal_file, mode="rflag", datacolumn="corrected", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
         #casa.flagdata(vis=ms_cal_file, mode='extend', datacolumn="corrected", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
         #lib_mepi.print_flags(ms_cal_file)
-        #os.system(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-preleak-flag.png' {ms_cal_file} >> shadems.log")
+        #os.system(f"{lib_runcode.shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-preleak-flag.png' {ms_cal_file} >> shadems.log")
 
         for cc in range(2):
             log.info(f'Calibration cycle {cc+1}')
@@ -199,31 +199,31 @@ def run():
             casa.polcal(vis=ms_cal_file,
                 caltable=tab['Df'],field=BandPassCal, poltype='Dflls', solint='inf', combine='scan',
                 gaintable=[tab['B'], tab['K'], tab['Gp'], tab['Ga']], interp=['linear,linearflag'], refant=ref_ant)
-            lib_runcode.run_ragavi.run(f'--table {tab["Df"]} --xaxis channel --yaxis amplitude --plotname ./PLOTS/cal_BP-Df-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Df"]} --xaxis channel --yaxis amplitude --plotname {cfg['path_plots']}/cal_BP-Df-cc{cc}.png')
             # plotms(vis=tab['Df'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
             casa.flagdata(vis=tab['Df'], mode='tfcrop', datacolumn="CPARAM", quackinterval=0.0, ntime="60s", combinescans=True, timecutoff=4.0, freqcutoff=3.0, usewindowstats="both", flagbackup=False)
-            lib_runcode.run_ragavi.run(f'--table {tab["Df"]} --xaxis channel --yaxis amplitude --plotname ./PLOTS/cal_BP-Df-cc{cc}-flag.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Df"]} --xaxis channel --yaxis amplitude --plotname {cfg['path_plots']}/cal_BP-Df-cc{cc}-flag.png')
             # plotms(vis=tab['Df'], xaxis='frequency', yaxis='amplitude', coloraxis='antenna1')
 
             if cc == 0:
                 casa.applycal(vis=ms_cal_file,field=BandPassCal, interp=['linear,linearflag','linear,linearflag'], flagbackup=False, 
                             gaintable=[tab['B'],tab['Df'],tab['K'],tab['Gp'],tab['Ga']])
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-postleak.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
                 casa.flagdata(vis=ms_cal_file, mode="rflag", datacolumn="residual", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
                 casa.flagdata(vis=ms_cal_file, mode='extend', datacolumn="residual", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
                 lib_mepi.print_flags(ms_cal_file)
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-postleak-flag.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
-                lib_runcode.run_shadems.run(f"-x ANTENNA1 -y CORRECTED_DATA:real --field {BandPassCal} --corr XY,YX --png './PLOTS/Bandpass-cross-ant.png' {ms_cal_file}") #important check for chosing the reference antenna, make sure that no antenna with extreme leakage is chosen  
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-postleak-flag.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
+                lib_runcode.run_shadems.run(f"-x ANTENNA1 -y CORRECTED_DATA:real --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-ant.png' {ms_cal_file}") #important check for chosing the reference antenna, make sure that no antenna with extreme leakage is chosen  
 
         # re-do BP to use better flags - usually it gives worse results...
         #log.info(f'Re-doing bandpass calibration with better flags...')
         #casa.bandpass(vis=ms_cal_file, field=BandPassCal, caltable=tab['B'], bandtype='B', combine='scan', solint='inf',
         #              gaintable=[tab['Df'],tab['K'],tab['Ginit']], interp=['linear,linearflag'], refant=ref_ant)
-        #os.system(f'{ragavi_command} --table {tab['B']} --plotname ./PLOTS/cal_BP-B-ccFINAL.png >> ragavi.log')
+        #os.system(f'{ragavi_command} --table {tab['B']} --plotname {cfg['path_plots']}/cal_BP-B-ccFINAL.png >> ragavi.log')
         # plotms(vis=tab['B'], coloraxis='antenna1', xaxis='freq', yaxis='amp')
         # plotms(vis=tab['B'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
-        #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-amp-FINAL.png' {ms_cal_file} >> shadems.log")
-        #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png './PLOTS/Bandpass-ph-FINAL.png' {ms_cal_file} >> shadems.log")
+        #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-amp-FINAL.png' {ms_cal_file} >> shadems.log")
+        #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-ph-FINAL.png' {ms_cal_file} >> shadems.log")
 
     ############################################################################
     # Bootrap secondary calibrator
@@ -235,22 +235,22 @@ def run():
             log.info(f'Calibration cycle {cc+1}')
             casa.gaincal(vis=ms_cal_file, caltable=tab['Ksec'], field=PhaseCal, gaintype='K', \
                         gaintable=[tab['B'], tab['Df'], tab['Ga']], interp=['linear,linearflag', 'linear,linearflag'], refant=ref_ant)
-            lib_runcode.run_ragavi.run(f'--table {tab["Ksec"]} --plotname ./PLOTS/cal_Sec-K-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Ksec"]} --plotname {cfg['path_plots']}/cal_Sec-K-cc{cc}.png')
             # plotms(vis=tab['Ksec'], coloraxis='antenna1', xaxis='time', yaxis='delay', xconnector='line')
             casa.gaincal(vis=ms_cal_file, caltable=tab['Gpsec'], field=PhaseCal, gaintype='G', calmode='p', \
                         gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Ksec']], interp=['linear,linearflag', 'linear,linearflag'], refant=ref_ant)
-            lib_runcode.run_ragavi.run(f'--table {tab["Gpsec"]} --yaxis phase --plotname ./PLOTS/cal_Sec-Gp-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Gpsec"]} --yaxis phase --plotname {cfg['path_plots']}/cal_Sec-Gp-cc{cc}.png')
             # plotms(vis=tab['Gpsec'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
             casa.gaincal(vis=ms_cal_file, caltable=tab['Tsec'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, \
                         gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Ksec'], tab['Gpsec']], interp=['linear,linearflag', 'linear,linearflag'], refant=ref_ant) # scalar as it can be polarised
-            lib_runcode.run_ragavi.run(f'--table {tab["Tsec"]} --yaxis amplitude --plotname ./PLOTS/cal_Sec-Ta-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Tsec"]} --yaxis amplitude --plotname {cfg['path_plots']}/cal_Sec-Ta-cc{cc}.png')
             # plotms(vis=tab['Tsec'], coloraxis='antenna1', xaxis='time', yaxis='amp', xconnector='line')
 
             if cc == 0:
                 # image the secondary and selfcal to improve the local model
                 casa.applycal(vis=ms_cal_file, field=PhaseCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
                             gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Ksec'], tab['Gpsec'], tab['Tsec']])
-                lib_runcode.run_wsclean.run(f'-name IMG/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
+                lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{PhaseCal}-selfcal -reorder -parallel-deconvolution 1024 -parallel-gridding 64 \
                         -update-model-required -weight briggs -0.2 -size 8000 8000 \
                         -scale {pixelscale}arcsec -channels-out 12 -pol I -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
                         -fit-spectral-pol 3 -deconvolution-channels 3 -auto-mask 5 -auto-threshold 3 -field {PhaseCal_id} {ms_cal_file}')
@@ -259,12 +259,12 @@ def run():
                 # flagging on residuals
                 casa.applycal(vis=ms_cal_file, field=PhaseCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
                             gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Ksec'], tab['Gpsec'], tab['Tsec']])
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XX,YY --png './PLOTS/Phasecal.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XX,YY --png '{cfg['path_plots']}/Phasecal.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
                 casa.flagdata(vis=ms_cal_file, mode="rflag", field=PhaseCal, datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
                 casa.flagdata(vis=ms_cal_file, mode='extend', field=PhaseCal, datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
                 lib_mepi.print_flags(ms_cal_file)
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XX,YY --png './PLOTS/Phasecal-flag.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
-                lib_runcode.run_shadems.run(f"-x uv -y CORRECTED_DATA:phase -c ANTENNA1 --corr XX,YY --field {PhaseCal} --png './PLOTS/Phasecal_uvphase_XXYY.png' {ms_cal_file}") # phase against uv-dsitance plot for the gain calibrator. Check both: scatter of phase per baseline (should be managable ~20deg) and if all long baselines are flagged (if the case need to adjust flagging again) 
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PhaseCal} --corr XX,YY --png '{cfg['path_plots']}/Phasecal-flag.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
+                lib_runcode.run_shadems.run(f"-x uv -y CORRECTED_DATA:phase -c ANTENNA1 --corr XX,YY --field {PhaseCal} --png '{cfg['path_plots']}/Phasecal_uvphase_XXYY.png' {ms_cal_file}") # phase against uv-dsitance plot for the gain calibrator. Check both: scatter of phase per baseline (should be managable ~20deg) and if all long baselines are flagged (if the case need to adjust flagging again) 
 
     ##############################################################################
     # Solve for polarization alignment
@@ -276,41 +276,41 @@ def run():
             log.info(f'Calibration cycle {cc+1}')
             casa.gaincal(vis=ms_cal_file, caltable=tab['Kpol'], field=PolCal, gaintype='K', interp=['linear,linearflag','linear,linearflag'], \
                         gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Gpsec'], tab['Tsec']], refant=ref_ant, solint='32s')
-            lib_runcode.run_ragavi.run(f'--table {tab["Kpol"]} --plotname ./PLOTS/cal_Pol-K-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Kpol"]} --plotname {cfg['path_plots']}/cal_Pol-K-cc{cc}.png')
             # plotms(vis=tab['Kpol'], coloraxis='antenna1', xaxis='time', yaxis='delay')
             # here we can use also secT to trace slow variations in the amp
             casa.gaincal(vis=ms_cal_file, caltable=tab['Gppol'], field=PolCal, gaintype='G', calmode='p', interp=['linear,linearflag','linear,linearflag'], 
                         gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Tsec'], tab['Kpol']], refant=ref_ant, solint='32s')
-            lib_runcode.run_ragavi.run(f'--table {tab["Gppol"]} --yaxis phase --plotname ./PLOTS/cal_Pol-Gp-cc{cc}.png')
+            lib_runcode.run_ragavi.run(f'--table {tab["Gppol"]} --yaxis phase --plotname {cfg['path_plots']}/cal_Pol-Gp-cc{cc}.png')
             # plotms(vis=tab['Gppol'], coloraxis='antenna1', xaxis='time', yaxis='phase', xconnector='line')
 
             casa.applycal(vis=ms_cal_file, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag'], \
                     gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Tsec'], tab['Kpol'], tab['Gppol']])
 
             if cc == 0:
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf.png' {ms_cal_file}")
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png '{cfg['path_plots']}/PolCal-cross-preXf.png' {ms_cal_file}")
                 casa.flagdata(vis=ms_cal_file, mode="rflag", field=PolCal, datacolumn="residual", quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False)
                 casa.flagdata(vis=ms_cal_file, mode='extend', field=PolCal, datacolumn='residual', growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True)
-                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-preXf-flag.png' {ms_cal_file}")
+                lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png '{cfg['path_plots']}/PolCal-cross-preXf-flag.png' {ms_cal_file}")
 
         # Xf that is constant within a scan, but it drift slowly with time, try not combining scans
         casa.polcal(vis=ms_cal_file, caltable=tab['Xf'], field=PolCal, poltype='Xf', solint='inf,10MHz', refant=ref_ant, interp=['linear,linearflag','linear,linearflag'],
         combine='', preavg=-1., gaintable=[tab['B'], tab['Df'], tab['Ga'], tab['Tsec'], tab['Kpol'], tab['Gppol']])
-        lib_runcode.run_ragavi.run(f'--table {tab["Xf"]} --yaxis phase --plotname ./PLOTS/cal_Pol-Xf.png')
+        lib_runcode.run_ragavi.run(f'--table {tab["Xf"]} --yaxis phase --plotname {cfg['path_plots']}/cal_Pol-Xf.png')
         # plotms(vis=tab['Xf'], xaxis='freq', yaxis='phase')
         log.info('Crosscal: Correcting for phase ambiguity')
         lib_sol.xyamb(log, xytab=tab['Xf'] ,xyout=tab['Xf_ambcorr'])
-        lib_runcode.run_ragavi.run(f'--table {tab["Xf_ambcorr"]} --yaxis phase --plotname ./PLOTS/cal_Pol-Xfambcorr.png')
+        lib_runcode.run_ragavi.run(f'--table {tab["Xf_ambcorr"]} --yaxis phase --plotname {cfg['path_plots']}/cal_Pol-Xfambcorr.png')
         # plotms(vis=tab['Xf_ambcorr'], xaxis='freq', yaxis='phase')
 
         log.info('Applying calibration to PolCal and test imaging...')
         # Final applycal to PolCal to check pol quality
         casa.applycal(vis=ms_cal_file, field=PolCal, parang=True, flagbackup=False, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
                     gaintable=[tab['B'], tab['Df'], tab['Xf_ambcorr'], tab['Ga'], tab['Tsec'], tab['Kpol'], tab['Gppol']])
-        lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png './PLOTS/PolCal-cross-postXf.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
+        lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {PolCal} --corr XY,YX --png '{cfg['path_plots']}/PolCal-cross-postXf.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
 
         # test image of the polcal - no update model!
-        lib_runcode.run_wsclean.run(f'-name IMG/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
+        lib_runcode.run_wsclean.run(f'-name {cfg['path_imgs']}/{PolCal}-selfcal -reorder -parallel-deconvolution 512 -parallel-gridding 64 \
                 -no-update-model-required -weight briggs -0.2 -size 1000 1000 \
                 -scale {pixelscale}arcsec -channels-out 12 -pol IQUV -data-column CORRECTED_DATA -niter 1000000 -mgain 0.8 -join-channels \
                 -multiscale -fit-spectral-pol 3 -auto-mask 5 -auto-threshold 3 -field {PolCal_id} {ms_cal_file}')
@@ -321,11 +321,11 @@ def run():
         log.info('Re-doing secondary calibrator calibration including Xf...')
         casa.gaincal(vis=ms_cal_file, caltable=tab['Ksec'], field=PhaseCal, gaintype='K', refant=ref_ant, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
                     gaintable=[tab['B'], tab['Df'], tab['Xf_ambcorr'], tab['Ga']])
-        lib_runcode.run_ragavi.run(f'--table {tab["Ksec"]} --plotname ./PLOTS/cal_Sec-K-FINAL.png')
+        lib_runcode.run_ragavi.run(f'--table {tab["Ksec"]} --plotname {cfg['path_plots']}/cal_Sec-K-FINAL.png')
         casa.gaincal(vis=ms_cal_file, caltable=tab['Gpsec'], field=PhaseCal, gaintype='G', calmode='p', refant=ref_ant, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
                     gaintable=[tab['B'], tab['Df'], tab['Xf_ambcorr'], tab['Ksec'], tab['Ga']])
-        lib_runcode.run_ragavi.run(f'--table {tab["Gpsec"]} --yaxis phase --plotname ./PLOTS/cal_Sec-Gp-FINAL.png')
+        lib_runcode.run_ragavi.run(f'--table {tab["Gpsec"]} --yaxis phase --plotname {cfg['path_plots']}/cal_Sec-Gp-FINAL.png')
         # parang=True for polarised sources and Xf should also be applied, otherwise it absorbs part of the effect
         casa.gaincal(vis=ms_cal_file, caltable=tab['Tsec'], field=PhaseCal, gaintype='T', calmode='a', solnorm=True, refant=ref_ant, parang=True, interp=['linear,linearflag','linear,linearflag', 'linear,linearflag'], \
                     gaintable=[tab['B'], tab['Df'], tab['Xf_ambcorr'], tab['Ga'], tab['Ksec'], tab['Gpsec']])
-        lib_runcode.run_ragavi.run(f'--table {tab["Tsec"]} --yaxis amplitude --plotname ./PLOTS/cal_Sec-Ta-FINAL.png')    
+        lib_runcode.run_ragavi.run(f'--table {tab["Tsec"]} --yaxis amplitude --plotname {cfg['path_plots']}/cal_Sec-Ta-FINAL.png')    

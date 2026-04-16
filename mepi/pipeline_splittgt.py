@@ -51,11 +51,11 @@ def run():
         casa.flagdata(vis=ms_tgt_file, flagbackup=False, mode='manual', autocorr=True)
         casa.flagdata(vis=ms_tgt_file, flagbackup=False, mode='clip', clipzeros=True, clipminmax=[0.0, 1000.0]) # high for virgo A, 100 is ok for others
         if ms_tgt.band == "UHF" or ms_tgt.band == "L": 
-            lib_runcode.run_command(f"{lib_runcode.mask_ms_command} --mask {lib_runcode.rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {ms_tgt_file}", cfg, logname='rfimask')
+            lib_runcode.run_mask_ms.run(f"--mask {lib_runcode.rfimask} --accumulation_mode or --memory 4096 --uvrange 0~1000 --statistics {ms_tgt_file}")
         lib_mepi.print_flags(ms_tgt_file)
         casa.flagmanager(vis=ms_tgt_file, mode='save', versionname='PreAoflagger')
-        lib_runcode.run_command(f"{lib_runcode.aoflagger_command} -strategy {lib_runcode.aoflagger_strategy1} -column CORRECTED_DATA {ms_tgt_file}", cfg, logname='aoflagger')
-        lib_runcode.run_command(f"{lib_runcode.aoflagger_command} -strategy {lib_runcode.aoflagger_strategy1} -column CORRECTED_DATA {ms_tgt_file}", cfg, logname='aoflagger') # twice
+        lib_runcode.run_aoflagger.run(f"-strategy {lib_runcode.aoflagger_strategy1} -column CORRECTED_DATA {ms_tgt_file}")
+        lib_runcode.run_aoflagger.run(f"-strategy {lib_runcode.aoflagger_strategy1} -column CORRECTED_DATA {ms_tgt_file}") # twice
         lib_mepi.print_flags(ms_tgt_file)
 
     # Split the target averaged in freq and time
