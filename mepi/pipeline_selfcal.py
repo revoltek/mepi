@@ -15,7 +15,7 @@ def run():
         w = lib_walker.Walker(f"selfcal-{target}")
         log.info(f"Found existing target MS: {ms_tgt_file} ({target})")
 
-        tab = {'K' : 'delay.cal',
+        basetab = {'K' : 'delay.cal',
                'Gp' : 'gain_p.cal',
                'Ga' : 'gain_a.cal'}
 
@@ -34,7 +34,7 @@ def run():
             casa.applycal(vis=ms_tgt_file, flagbackup=False, parang=True)
 
         for cc in range(10):
-            tab = {k: os.path.join(cfg['path_sols'], f"{target}-selfcal-c{cc:02d}.{v}") for k, v in tab.items()}
+            tab = {k: os.path.join(cfg['path_sols'], f"{target}-selfcal-c{cc:02d}.{v}") for k, v in basetab.items()}
             with w.if_todo(f"selfcal-cycle-{cc+1}"):
                 log.info(f'Self-calibration cycle {cc+1}')
                 # ok for m87 sband
