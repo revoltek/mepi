@@ -7,7 +7,10 @@ import numpy as np
 from astropy import units as u
 from astropy.convolution import convolve_fft
 from radio_beam import Beam
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from astropy.wcs import WCS
 try:
     from regions import Regions
@@ -324,19 +327,24 @@ def plot_outlier_histogram(values, threshold, title, xlabel, filename):
     filename : str
         Output filename for the plot
     """
-    plt.figure(figsize=(10, 6))
-    plt.hist(values, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
-    plt.axvline(threshold, color='red', linestyle='--', linewidth=2, 
-                label=f'Outlier threshold: {threshold:.2e}')
-    plt.xlabel(xlabel)
-    plt.ylabel('Number of channels')
-    plt.title(title)
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"Saved outlier histogram to {filename}")
+    print(f"Saving outlier histogram to {filename}...")
+    try:
+        fig = Figure(figsize=(10, 6))
+        FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.hist(values, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
+        ax.axvline(threshold, color='red', linestyle='--', linewidth=2,
+                   label=f'Outlier threshold: {threshold:.2e}')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel('Number of channels')
+        ax.set_title(title)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+        fig.savefig(filename, dpi=150, bbox_inches='tight')
+        print(f"Saved outlier histogram to {filename}")
+    except Exception as exc:
+        print(f"Warning: failed to save outlier histogram {filename}: {exc}")
 
 def main():
     parser = argparse.ArgumentParser(
