@@ -49,9 +49,15 @@ def main():
     # todo: add cleanup
     with w.if_todo("cleanup"):
         log.info("Cleaning up intermediate files...")
-        for pattern in [cfg["path_ms"], cfg["path_imgs"], cfg["path_plots"], cfg["path_logs"], cfg["path_sols"]]:
-            log.info(f"Removing {pattern}")
-            shutil.rmtree(pattern, ignore_errors=True)
+        cleanup_dirs = [cfg["path_ms"], cfg["path_imgs"], cfg["path_plots"], cfg["path_logs"], cfg["path_sols"]]
+        msfull = os.path.realpath(cfg["ms_full"])
+        for d in cleanup_dirs:
+            if msfull.startswith(os.path.realpath(d) + os.sep) or msfull == os.path.realpath(d):
+                log.error(f"Aborting cleanup: cfg['ms_full'] ({cfg['ms_full']}) is inside {d}")
+                sys.exit(1)
+        for d in cleanup_dirs:
+            log.info(f"Removing {d}")
+            shutil.rmtree(d, ignore_errors=True)
 
     # create dirs if missing
     for d in [cfg["path_ms"], cfg["path_imgs"], cfg["path_plots"], cfg["path_logs"], cfg["path_sols"]]:

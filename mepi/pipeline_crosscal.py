@@ -209,8 +209,8 @@ def run():
                 casa.applycal(vis=ms_cal_file,field=BandPassCal, interp=['linear,linearflag','linear,linearflag'], flagbackup=False, 
                             gaintable=[tab['B'],tab['Df'],tab['K'],tab['Gp'],tab['Ga']])
                 lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-postleak.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
-                casa.flagdata(vis=ms_cal_file, mode="rflag", datacolumn="residual", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
-                casa.flagdata(vis=ms_cal_file, mode='extend', datacolumn="residual", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
+                casa.flagdata(vis=ms_cal_file, mode="rflag", datacolumn="corrected", field=BandPassCal, quackinterval=0.0, timecutoff=4.0, freqcutoff=3.0, extendpols=False, flagbackup=False, outfile="",overwrite=True, extendflags=False, correlation='XY,YX')
+                casa.flagdata(vis=ms_cal_file, mode='extend', datacolumn="corrected", field=BandPassCal, growtime=80, growfreq=80, flagbackup=False, growaround=True, flagnearfreq=True, correlation='XY,YX')
                 lib_mepi.print_flags(ms_cal_file)
                 lib_runcode.run_shadems.run(f"-x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-postleak-flag.png' {ms_cal_file}") # check if the amp are reduced and no big waves/spikes should be there
                 lib_runcode.run_shadems.run(f"-x ANTENNA1 -y CORRECTED_DATA:real --field {BandPassCal} --corr XY,YX --png '{cfg['path_plots']}/Bandpass-cross-ant.png' {ms_cal_file}") #important check for chosing the reference antenna, make sure that no antenna with extreme leakage is chosen  
@@ -224,7 +224,7 @@ def run():
         # plotms(vis=tab['B'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
         #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-amp-FINAL.png' {ms_cal_file} >> shadems.log")
         #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-ph-FINAL.png' {ms_cal_file} >> shadems.log")
-
+    sys.exit()
     ############################################################################
     # Bootrap secondary calibrator
     with w.if_todo("secondary_cal"):

@@ -83,7 +83,7 @@ def print_flags(vis):
     ##############
     # Print flagging summary
     ##############
-    s = casa.flagdata(vis=vis, mode='summary')
+    s = casa.flagdata(vis=vis, mode='summary', spwchan=True)
     # Print per-antenna flags on one line
     ant_flags = ', '.join([f"{ant}: {100.0*info.get('flagged', 0)/info.get('total', 0):.1f}%" 
                            for ant, info in s['antenna'].items()])
@@ -94,6 +94,33 @@ def print_flags(vis):
                            for scan, info in sorted(s['scan'].items(), key=lambda x: int(x[0]))])
     print(f"Scan flags: {scan_flags}")
     
+    # Print a table of per-channel flags (10 channels per line)
+    # s['spw:channel'] keys are flat strings like '0:0', '0:1', etc.
+    from collections import defaultdict
+    spw_chans = defaultdict(dict)
+    for key, info in s['spw:channel'].items():
+        spw, chan = key.split(':')
+        spw_chans[spw][chan] = info
+    print("Channel flags:")
+    block = 10
+    for spw in sorted(spw_chans.keys(), key=int):
+        chan_info = spw_chans[spw]
+        chans = sorted(chan_info.keys(), key=int)
+        pcts = [100.0 * chan_info[c].get('flagged', 0) / chan_info[c].get('total', 0)
+                if chan_info[c].get('total', 0) > 0 else 0.0
+                for c in chans]
+        RED, RESET = "\033[31m", "\033[0m"
+        for start in range(0, len(chans), block):
+            chunk_chans = chans[start:start+block]
+            chunk_pcts  = pcts[start:start+block]
+            header = f"{'SPW':<5} " + "".join(f"{c:>7}" for c in chunk_chans)
+            values = f"{spw:<5} " + "".join(
+                f"{RED}{p:>6.1f}%{RESET}" if p >= 100.0 else f"{p:>6.1f}%"
+                for p in chunk_pcts)
+            if start == 0:
+                print(header)
+            print(values)
+
     # Print total flags percentage
     total_flagged = s.get('flagged', 0)
     total_points = s.get('total', 0)
