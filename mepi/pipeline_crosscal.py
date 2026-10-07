@@ -224,7 +224,7 @@ def run():
         # plotms(vis=tab['B'], coloraxis='antenna1', xaxis='freq', yaxis='phase')
         #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:amp --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-amp-FINAL.png' {ms_cal_file} >> shadems.log")
         #os.system(f"{shadems_command} -x FREQ -y CORRECTED_DATA:phase --field {BandPassCal} --corr XX,YY --png '{cfg['path_plots']}/Bandpass-ph-FINAL.png' {ms_cal_file} >> shadems.log")
-    sys.exit()
+
     ############################################################################
     # Bootrap secondary calibrator
     with w.if_todo("secondary_cal"):
